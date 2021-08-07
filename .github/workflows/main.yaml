@@ -1,0 +1,32 @@
+name: Kiro Audio
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  test:
+    name: Run format check, clippy and tests
+    strategy:
+      matrix:
+        toolchain: [stable]
+        os: [macOS-latest] # we could add ubuntu-latest & windows-latest but don't need it for the moment
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+          components: rustfmt, clippy
+
+      - name: Install cargo-make
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-make
+      - run: cargo make all

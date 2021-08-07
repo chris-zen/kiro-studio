@@ -1,0 +1,16 @@
+[package]
+name = "kiro-audio-engine"
+version = "0.1.0"
+authors = ["Christian Perez Llamas"]
+edition = "2018"
+
+[dependencies]
+kiro-midi-core = { path = "../kiro-midi-core" }
+kiro-audio-driver = { path = "../kiro-audio-driver" }
+kiro-audio-graph = { path = "../kiro-audio-graph" }
+
+thiserror = "~1.0"
+anyhow = "~1.0"
+ringbuf = "~0.2"
+generic-array = "~0.14"
+array-macro = "~2.1.0"
