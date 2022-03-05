@@ -3,7 +3,7 @@ use kiro_midi_core::messages::Message as MidiMessage;
 use crate::time::{BarsTime, ClockTime, Signature, Tempo, TicksTime};
 
 mod allocator;
-mod bplus_tree;
+// mod bplus_tree;
 mod events_buffer;
 mod queue;
 

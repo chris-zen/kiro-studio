@@ -130,8 +130,8 @@ pub struct BplusTree<K, V, const O: usize> {
 
 impl<K, V, const O: usize> BplusTree<K, V, O>
 where
-  K: Clone + PartialOrd,
-  V: Clone,
+  K: Clone + PartialOrd + core::fmt::Debug,
+  V: Clone + core::fmt::Debug,
 {
   pub fn new() -> Self {
     Self { root: None }
@@ -165,7 +165,8 @@ where
     Alloc: Allocator<Node<K, V, O>>,
   {
     let leaf_node = LeafNode::from_key_value(key, value);
-    let leaf_node_ref = Self::create_leaf_node_ref(leaf_node, alloc)?;
+    let leaf_node_ref = Self::create_leaf_node_ref(leaf_node, alloc)
+      .map_err(|_| BplusTreeError::InternalError)?; // FIXME key and value must be returned back in case of error
     self.root = Some(leaf_node_ref);
 
     Ok(())
@@ -175,21 +176,22 @@ where
   where
     Alloc: Allocator<Node<K, V, O>>,
   {
-    let node_ref = self
+    let leaf_node_ref = self
       .find_leaf_node(&key)
       .ok_or(BplusTreeError::LeafNotFound)?;
 
-    let mut node = node_ref.borrow_mut();
+    let mut node = leaf_node_ref.borrow_mut();
     let leaf_node = node.as_leaf_mut().unwrap(); // this can only be a leaf
 
     let insert_result = leaf_node
       .insert(key, value)
       .map_err(|_| BplusTreeError::LeafOverflow)?;
+      // FIXME key and value must be returned to avoid deallocation in case of error
 
     if leaf_node.len() == O {
       let mut new_leaf_node = leaf_node.split();
 
-      match self.insert_leaf_into_parent(node_ref.clone(), new_leaf_node, 0, alloc) {
+      match self.insert_leaf_into_parent(leaf_node_ref.clone(), leaf_node, new_leaf_node, 0, alloc) {
         Ok(new_leaf_node_ref) => {
           let mut new_node = new_leaf_node_ref.borrow_mut();
           let new_leaf_node = new_node.as_leaf_mut().unwrap(); // this can only be a leaf
@@ -240,7 +242,8 @@ where
   fn insert_leaf_into_parent<Alloc>(
     &mut self,
     prev_leaf_node_ref: NodeRef<K, V, O>,
-    new_leaf_node: LeafNode<K, V, O>,
+    prev_leaf_node: &LeafNode<K, V, O>,
+    mut new_leaf_node: LeafNode<K, V, O>,
     num_allocations: usize,
     alloc: &mut Alloc,
   ) -> core::result::Result<NodeRef<K, V, O>, LeafNode<K, V, O>>
@@ -248,26 +251,33 @@ where
     Alloc: Allocator<Node<K, V, O>>,
   {
     match new_leaf_node.get_parent() {
-      Some(parent) => {
-        unimplemented!()
+      Some(parent_node_ref) => {
+        new_leaf_node.set_parent(Some(parent_node_ref.clone()));
+        let new_node_ref = Self::create_leaf_node_ref(new_leaf_node, alloc)?;
+        // TODO add new leaf to parent
+        Ok(new_node_ref)
       }
       None => {
-        match prev_leaf_node_ref
-          .borrow()
+        match prev_leaf_node
           .first_key()
           .zip(new_leaf_node.first_key())
         {
           Some((prev_leaf_key, new_leaf_key)) => {
             // TODO check that there will be enough memory to allocate all the required allocations, or fail
-            if alloc.available() <= num_allocations {
+            if alloc.available() <= num_allocations + 1 {
               Err(new_leaf_node)
             } else {
               // TODO create a new internal node and add both leafs to it
               let internal_node = InternalNode::new(None);
               // TODO internal_node.insert(prev_leaf_key.clone(), prev_leaf_node_ref.clone());
-              let parent_node_ref =
-                Self::create_internal_node_ref(internal_node, alloc).map_err(|_| new_leaf_node)?;
-              Ok(parent_node_ref)
+              if let Ok(parent_node_ref) = Self::create_internal_node_ref(internal_node, alloc) {
+                new_leaf_node.set_parent(Some(parent_node_ref.clone()));
+                let new_node_ref = Self::create_leaf_node_ref(new_leaf_node, alloc)?; // FIXME deallocate parent node if failure
+                self.root = Some(parent_node_ref);
+                Ok(new_node_ref)
+              } else {
+                Err(new_leaf_node)
+              }
             }
           }
           None => Err(new_leaf_node), // this is unexpected to happen
@@ -291,25 +301,33 @@ where
   fn create_leaf_node_ref<Alloc>(
     leaf_node: LeafNode<K, V, O>,
     alloc: &mut Alloc,
-  ) -> Result<NodeRef<K, V, O>>
+  ) -> core::result::Result<NodeRef<K, V, O>, LeafNode<K, V, O>>
   where
     Alloc: Allocator<Node<K, V, O>>,
   {
-    let node = alloc.acquire().map_err(BplusTreeError::NodeAllocation)?;
-    *node.borrow_mut() = Node::Leaf(leaf_node);
-    Ok(node)
+    if let Ok(node) = alloc.acquire() {
+      *node.borrow_mut() = Node::Leaf(leaf_node);
+      Ok(node)
+    } else {
+      Err(leaf_node)
+    }
+    
   }
 
   fn create_internal_node_ref<Alloc>(
     internal_node: InternalNode<K, V, O>,
     alloc: &mut Alloc,
-  ) -> Result<NodeRef<K, V, O>>
+  ) -> core::result::Result<NodeRef<K, V, O>, InternalNode<K, V, O>>
   where
     Alloc: Allocator<Node<K, V, O>>,
   {
-    let node = alloc.acquire().map_err(BplusTreeError::NodeAllocation)?;
-    *node.borrow_mut() = Node::Internal(internal_node);
-    Ok(node)
+    if let Ok(node_ref) = alloc.acquire() {
+      *node_ref.borrow_mut() = Node::Internal(internal_node);
+      Ok(node_ref)
+    }
+    else {
+      Err(internal_node)
+    }
   }
 }
 
@@ -356,7 +374,7 @@ mod tests {
   #[test]
   fn bplustree_insert_into_leaf_with_split_succeeds() {
     let mut tree: BplusTree<i32, i32, 3> = BplusTree::new();
-    let mut alloc = TestAllocator::new(2);
+    let mut alloc = TestAllocator::new(20);
 
     tree.insert(1, 10, &mut alloc).expect("insert failed");
     tree.insert(2, 20, &mut alloc).expect("insert failed");

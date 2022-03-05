@@ -91,3 +91,6 @@ incubator/
 media/
 
 Cargo.lock
+kiro-synth-dsp
+kiro-audio-synth
+
