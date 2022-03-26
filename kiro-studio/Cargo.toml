@@ -1,0 +1,13 @@
+[package]
+name = "kiro-studio"
+version = "0.1.0"
+authors = ["Christian Perez Llamas"]
+edition = "2021"
+
+[dependencies]
+thiserror = "1.0"
+ringbuf = "0.2"
+
+kiro-midi = { path = "../kiro-midi" }
+kiro-audio = { path = "../kiro-audio" }
+kiro-engine = { path = "../kiro-engine" }

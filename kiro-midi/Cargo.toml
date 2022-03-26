@@ -1,0 +1,18 @@
+[package]
+name = "kiro-midi"
+version = "0.1.0"
+authors = ["Christian Perez Llamas"]
+edition = "2021"
+
+[dependencies]
+thiserror = "1.0"
+ringbuf = "0.2"
+regex = "1.5"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+parking_lot = "0.12"
+arc-swap = "1.5"
+
+core-foundation-sys = "0.8.3"
+core-foundation = "0.9.3"
+coremidi = { path = "../../coremidi" }
