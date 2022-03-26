@@ -3,6 +3,7 @@ members = [
     "kiro-audio",
     "kiro-midi",
     "kiro-engine",
+    "kiro-studio",
 #    "kiro-synth",
 #    "kiro-synth-dsp",
 ]
