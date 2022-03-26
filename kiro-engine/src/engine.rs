@@ -8,10 +8,6 @@ pub struct Engine {
 }
 
 impl Engine {
-  pub fn new() -> Self {
-    Self::with_config(EngineConfig::default())
-  }
-
   pub fn with_config(config: EngineConfig) -> Self {
     let ring_buffer_capacity = config.ring_buffer_capacity;
     let (forward_tx, forward_rx) = RingBuffer::new(ring_buffer_capacity).split();
@@ -31,5 +27,11 @@ impl Engine {
       renderer,
     } = self;
     (controller, renderer)
+  }
+}
+
+impl Default for Engine {
+  fn default() -> Self {
+    Self::with_config(EngineConfig::default())
   }
 }

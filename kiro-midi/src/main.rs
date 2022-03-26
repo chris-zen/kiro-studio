@@ -1,27 +1,28 @@
 use core_foundation::runloop::CFRunLoop;
-use kiro_midi::{MidiDriver, MidiFilter, MidiInputConfig, MidiSourceMatch, MidiSourceMatches};
+use kiro_midi::{self as midi, drivers::DriverSpec};
 
 fn main() {
-  let mut driver = MidiDriver::new("test").unwrap();
+  let mut driver = midi::drivers::create("test").unwrap();
 
-  let input_config1 = MidiInputConfig::new("novation").with_source(
-    MidiSourceMatch::regex("Novation SL MkIII.*").unwrap(),
-    MidiFilter::default(),
+  let input_config1 = midi::InputConfig::new("novation").with_source(
+    midi::SourceMatch::regex("Novation SL MkIII.*").unwrap(),
+    midi::Filter::default(),
   );
 
-  let input_config2 = MidiInputConfig::new("arturia").with_source(
-    MidiSourceMatch::regex("Midi.*").unwrap(),
-    MidiFilter::default().with_channels(1, &[1, 2]),
+  let input_config2 = midi::InputConfig::new("arturia").with_source(
+    midi::SourceMatch::regex("Midi.*").unwrap(),
+    midi::Filter::default().with_channels(1, &[1, 2]),
   );
-
-  print_endpoints(&driver);
 
   driver
     .create_input(input_config1, |event| println!(">> {:?}", event))
     .unwrap();
+
   driver
     .create_input(input_config2, |event| println!(">> {:?}", event))
     .unwrap();
+
+  print_endpoints(&driver);
 
   let _join = std::thread::spawn(move || loop {
     loop {
@@ -34,16 +35,16 @@ fn main() {
 
       if let Some(mut arturia_config) = driver.get_input_config("arturia") {
         arturia_config.sources.add_source(
-          MidiSourceMatch::regex("Midi.*").unwrap(),
-          MidiFilter::default().with_channels(1, &[1]),
+          midi::SourceMatch::regex("Midi.*").unwrap(),
+          midi::Filter::default().with_channels(1, &[1]),
         );
 
         driver
           .set_input_sources(
             "arturia",
-            MidiSourceMatches::default().with_source(
-              MidiSourceMatch::regex("IAC.*").unwrap(),
-              MidiFilter::default().with_channels(1, &[1]),
+            midi::SourceMatches::default().with_source(
+              midi::SourceMatch::regex("IAC.*").unwrap(),
+              midi::Filter::default().with_channels(1, &[1]),
             ),
           )
           .ok();
@@ -56,7 +57,7 @@ fn main() {
   CFRunLoop::run_current();
 }
 
-fn print_endpoints(driver: &MidiDriver) {
+fn print_endpoints(driver: &midi::drivers::Driver) {
   println!("===================================================================================");
   println!("Sources:");
   for mut source in driver.sources() {

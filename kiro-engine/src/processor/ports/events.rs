@@ -29,7 +29,7 @@ impl<IO> EventsPort<IO> {
 }
 
 impl EventsPort<Output> {
-  pub fn buffer_mut(&self) -> &mut EventsBuffer {
+  pub fn buffer_mut(&mut self) -> &mut EventsBuffer {
     self.buffer.get_mut()
   }
 }

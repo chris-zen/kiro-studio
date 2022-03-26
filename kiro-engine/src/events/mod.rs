@@ -1,9 +1,9 @@
+// mod allocator;
+pub mod buffer;
+
 pub use kiro_midi as midi;
 
 use crate::time::{BarsTime, ClockTime, Signature, Tempo, TicksTime};
-
-mod allocator;
-pub mod buffer;
 
 pub type EventTimestamp = TicksTime;
 

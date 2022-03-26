@@ -1,8 +1,8 @@
 use crate::endpoints::SourceId;
-use crate::source_match::MidiSourceMatches;
+use crate::source_match::SourceMatches;
 
-pub struct MidiInputInfo {
+pub struct InputInfo {
   pub name: String,
-  pub sources: MidiSourceMatches,
+  pub sources: SourceMatches,
   pub connected_sources: Vec<SourceId>,
 }

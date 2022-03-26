@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::filter::MidiFilter;
+use crate::filter::Filter;
 use crate::protocol::messages::channel_voice::ChannelVoice;
 use crate::protocol::messages::utility::Utility;
 use crate::protocol::messages::{Message, MessageType};
@@ -20,15 +20,7 @@ pub struct DecoderProtocol2 {
 }
 
 impl DecoderProtocol2 {
-  pub fn new() -> Self {
-    Self {
-      ump: [0; 4],
-      index: 0,
-      len: 0,
-    }
-  }
-
-  pub fn next(&mut self, data: u32, filter: &MidiFilter) -> Result<Option<Message>, Error> {
+  pub fn next(&mut self, data: u32, filter: &Filter) -> Result<Option<Message>, Error> {
     if self.index == 0 {
       self.init(data);
     }
@@ -78,7 +70,7 @@ impl DecoderProtocol2 {
     (mtype, group)
   }
 
-  fn decode(&mut self, mtype: u8, group: u8, filter: &MidiFilter) -> Option<Message> {
+  fn decode(&mut self, mtype: u8, group: u8, filter: &Filter) -> Option<Message> {
     match mtype {
       0x00 => Some(Message {
         group,
@@ -111,7 +103,7 @@ mod tests {
 
   #[test]
   fn first_word_does_not_emit() {
-    let filter = MidiFilter::none();
+    let filter = Filter::none();
     let mut decoder = DecoderProtocol2::default();
 
     let result = decoder.next(0x40903c00, &filter);
@@ -125,7 +117,7 @@ mod tests {
 
   #[test]
   fn last_word_emits() {
-    let filter = MidiFilter::none();
+    let filter = Filter::none();
     let mut decoder = DecoderProtocol2::default();
 
     decoder.next(0x41923c00, &filter);
@@ -150,7 +142,7 @@ mod tests {
 
   #[test]
   fn two_messages_are_emitted() {
-    let filter = MidiFilter::none();
+    let filter = Filter::none();
     let mut decoder = DecoderProtocol2::default();
 
     decoder.next(0x41923c00, &filter);

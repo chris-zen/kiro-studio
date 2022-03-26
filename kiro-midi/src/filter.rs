@@ -1,13 +1,13 @@
 use std::fmt::{Debug, Formatter};
 
 #[derive(Clone, Copy)]
-pub struct MidiFilter {
+pub struct Filter {
   mtypes: u16,
   groups: u16,
   channels: [u16; 16],
 }
 
-impl MidiFilter {
+impl Filter {
   pub fn none() -> Self {
     Self {
       mtypes: 0xffff,
@@ -64,13 +64,13 @@ impl MidiFilter {
   }
 }
 
-impl Default for MidiFilter {
+impl Default for Filter {
   fn default() -> Self {
     Self::none()
   }
 }
 
-impl Debug for MidiFilter {
+impl Debug for Filter {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     writeln!(f, "MidiFilter:")?;
     writeln!(f, "  MT : {:016b}  GR : {:016b}", self.mtypes, self.groups)?;

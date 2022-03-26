@@ -61,7 +61,7 @@ impl<T> KeyStore<T> {
   }
 
   pub fn iter(&self) -> impl Iterator<Item = (Key<T>, &T)> {
-    self.data.iter().map(|(key, value)| (key.clone(), value))
+    self.data.iter().map(|(key, value)| (*key, value))
   }
 
   // TODO remove an element
@@ -127,7 +127,7 @@ impl<T: HasId> KeyStoreWithId<T> {
   pub fn add(&mut self, item: T) -> Key<T> {
     let id = item.id().to_string();
     let key = self.key_store.add(item);
-    self.keys_by_id.insert(id, key.clone());
+    self.keys_by_id.insert(id, key);
     key
   }
 
@@ -141,7 +141,7 @@ impl<T: HasId> KeyStoreWithId<T> {
     self
       .key_store
       .iter()
-      .map(|(key, value)| (key.clone(), value))
+      .map(|(key, value)| (key, value))
   }
 
   // TODO remove an element

@@ -23,10 +23,14 @@ impl<IO> AudioRenderBuffer<IO> {
   pub fn len(&self) -> usize {
     self.num_samples
   }
+
+  pub fn is_empty(&self) -> bool {
+    self.num_samples == 0
+  }
 }
 
 impl AudioRenderBuffer<Input> {
-  pub fn iter<'a>(&'a self) -> impl Iterator<Item = &'a f32> + 'a {
+  pub fn iter(&self) -> impl Iterator<Item = &f32> {
     self.buffer.deref().iter().take(self.num_samples)
   }
 
@@ -40,7 +44,7 @@ impl AudioRenderBuffer<Output> {
     self.buffer.get_mut().fill_first(self.num_samples, value);
   }
 
-  pub fn iter_mut<'a>(&'a mut self) -> impl Iterator<Item = &'a mut f32> + 'a {
+  pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut f32> {
     self.buffer.get_mut().iter_mut().take(self.num_samples)
   }
 
@@ -71,6 +75,10 @@ impl<IO> AudioPort<IO> {
 
   pub fn len(&self) -> usize {
     self.channels.len()
+  }
+
+  pub fn is_empty(&self) -> bool {
+    self.len() == 0
   }
 }
 

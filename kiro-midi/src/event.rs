@@ -1,6 +1,6 @@
-use std::fmt::Formatter;
 use crate::endpoints::EndpointId;
 use crate::protocol::messages::Message;
+use std::fmt::Formatter;
 
 pub type TimestampNanos = u64;
 
@@ -13,6 +13,10 @@ pub struct MidiEvent {
 
 impl std::fmt::Debug for MidiEvent {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "[{:08x}] {:016} {:?}", self.endpoint, self.timestamp, self.message)
+    write!(
+      f,
+      "[{:08x}] {:016} {:?}",
+      self.endpoint, self.timestamp, self.message
+    )
   }
 }

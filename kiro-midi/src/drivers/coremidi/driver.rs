@@ -9,21 +9,22 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use thiserror::Error;
 
+use crate::drivers;
 use crate::drivers::coremidi::endpoints::Endpoints;
 use crate::drivers::coremidi::timestamp::coremidi_timestamp_to_nanos;
 use crate::endpoints::{DestinationInfo, EndpointId, SourceId, SourceInfo};
 use crate::event::MidiEvent;
-use crate::filter::MidiFilter;
-use crate::input_config::MidiInputConfig;
-use crate::input_handler::MidiInputHandler;
-use crate::input_info::MidiInputInfo;
+use crate::filter::Filter;
+use crate::input_config::InputConfig;
+use crate::input_handler::InputHandler;
+use crate::input_info::InputInfo;
 use crate::protocol::decoder::DecoderProtocol2;
-use crate::source_match::MidiSourceMatches;
+use crate::source_match::SourceMatches;
 
 type InputName = String;
 
 #[derive(Error, Debug)]
-pub enum Error {
+pub enum CoreMidiError {
   #[error("Error creating a new client: {0}")]
   ClientCreate(OSStatus),
 
@@ -31,7 +32,7 @@ pub enum Error {
   PortCreate(OSStatus),
 
   #[error("An input with this name already exists: {0:?}")]
-  InputAlreadyExists(MidiInputConfig),
+  InputAlreadyExists(InputConfig),
 
   #[error("Input not found: {0}")]
   InputNotFound(InputName),
@@ -45,90 +46,27 @@ pub enum Error {
 
 struct Input {
   name: InputName,
-  sources: MidiSourceMatches,
+  sources: SourceMatches,
   connected: HashSet<SourceId>,
-  filters: Arc<ArcSwap<HashMap<SourceId, MidiFilter>>>,
+  filters: Arc<ArcSwap<HashMap<SourceId, Filter>>>,
   port: coremidi::InputPortWithContext<SourceId>,
 }
 
-pub struct Driver {
+pub struct CoreMidiDriver {
   client: Client,
   endpoints: Arc<Mutex<Endpoints>>,
   inputs: Arc<Mutex<HashMap<String, Input>>>,
 }
 
-impl Driver {
-  pub fn new(name: &str) -> Result<Self, Error> {
-    let endpoints = Arc::new(Mutex::new(Endpoints::new()));
-    let inputs = Arc::new(Mutex::new(HashMap::new()));
-    let callback = Self::notifications_callback(endpoints.clone(), inputs.clone());
-    let client = Client::new_with_notifications(name, callback).map_err(Error::ClientCreate)?;
-    Self::initialize_endpoints(endpoints.clone());
-
-    Ok(Self {
-      client,
-      endpoints,
-      inputs,
-    })
-  }
-
-  pub fn sources(&self) -> Vec<SourceInfo> {
-    let endpoints = self.endpoints.lock();
-
-    let mut source_inputs = HashMap::<SourceId, HashSet<String>>::new();
-    for input in self.inputs.lock().values() {
-      for source_id in input.connected.iter().cloned() {
-        let inputs = source_inputs.entry(source_id).or_default();
-        inputs.insert(input.name.clone());
-      }
-    }
-
-    endpoints
-      .connected_sources()
-      .into_iter()
-      .map(|connected_source| {
-        let inputs = source_inputs
-          .get(&connected_source.id)
-          .map(|inputs| inputs.iter().cloned().collect::<Vec<String>>())
-          .unwrap_or_default();
-        SourceInfo::new(connected_source.id, connected_source.name.clone(), inputs)
-      })
-      .collect()
-  }
-
-  pub fn destinations(&self) -> Vec<DestinationInfo> {
-    self
-      .endpoints
-      .lock()
-      .connected_destinations()
-      .into_iter()
-      .map(|connected_destination| {
-        DestinationInfo::new(connected_destination.id, connected_destination.name.clone())
-      })
-      .collect()
-  }
-
-  pub fn inputs(&self) -> Vec<MidiInputInfo> {
-    self
-      .inputs
-      .lock()
-      .values()
-      .map(|input| MidiInputInfo {
-        name: input.name.clone(),
-        sources: input.sources.clone(),
-        connected_sources: input.connected.iter().cloned().collect(),
-      })
-      .collect()
-  }
-
-  pub fn create_input<H>(&mut self, config: MidiInputConfig, handler: H) -> Result<String, Error>
+impl drivers::DriverSpec for CoreMidiDriver {
+  fn create_input<H>(&mut self, config: InputConfig, handler: H) -> Result<String, drivers::Error>
   where
-    H: Into<MidiInputHandler>,
+    H: Into<InputHandler>,
   {
     if self.inputs.lock().contains_key(config.name.as_str()) {
-      Err(Error::InputAlreadyExists(config))
+      Err(CoreMidiError::InputAlreadyExists(config).into())
     } else {
-      let MidiInputConfig { name, sources } = config;
+      let InputConfig { name, sources } = config;
 
       let filters = self
         .endpoints
@@ -140,7 +78,7 @@ impl Driver {
             .match_filter(connected_source.id, connected_source.name.as_str())
             .map(|filter| (connected_source.id, filter))
         })
-        .collect::<HashMap<SourceId, MidiFilter>>();
+        .collect::<HashMap<SourceId, Filter>>();
 
       let filters = Arc::new(ArcSwap::new(Arc::new(filters)));
 
@@ -172,13 +110,131 @@ impl Driver {
     }
   }
 
+  fn sources(&self) -> Vec<SourceInfo> {
+    let endpoints = self.endpoints.lock();
+
+    let mut source_inputs = HashMap::<SourceId, HashSet<String>>::new();
+    for input in self.inputs.lock().values() {
+      for source_id in input.connected.iter().cloned() {
+        let inputs = source_inputs.entry(source_id).or_default();
+        inputs.insert(input.name.clone());
+      }
+    }
+
+    endpoints
+      .connected_sources()
+      .into_iter()
+      .map(|connected_source| {
+        let inputs = source_inputs
+          .get(&connected_source.id)
+          .map(|inputs| inputs.iter().cloned().collect::<Vec<String>>())
+          .unwrap_or_default();
+        SourceInfo::new(connected_source.id, connected_source.name.clone(), inputs)
+      })
+      .collect()
+  }
+
+  fn destinations(&self) -> Vec<DestinationInfo> {
+    self
+      .endpoints
+      .lock()
+      .connected_destinations()
+      .into_iter()
+      .map(|connected_destination| {
+        DestinationInfo::new(connected_destination.id, connected_destination.name.clone())
+      })
+      .collect()
+  }
+
+  fn inputs(&self) -> Vec<InputInfo> {
+    self
+      .inputs
+      .lock()
+      .values()
+      .map(|input| InputInfo {
+        name: input.name.clone(),
+        sources: input.sources.clone(),
+        connected_sources: input.connected.iter().cloned().collect(),
+      })
+      .collect()
+  }
+
+  fn get_input_config(&self, name: &str) -> Option<InputConfig> {
+    self.inputs.lock().get(name).map(|input| InputConfig {
+      name: input.name.clone(),
+      sources: input.sources.clone(),
+    })
+  }
+
+  fn set_input_sources(&self, name: &str, sources: SourceMatches) -> Result<(), drivers::Error> {
+    let endpoints = self.endpoints.lock();
+
+    let mut inputs = self.inputs.lock();
+
+    let input = inputs
+      .get_mut(name)
+      .ok_or_else(|| CoreMidiError::InputNotFound(name.to_string()))?;
+
+    let connected_sources = endpoints
+      .connected_sources()
+      .into_iter()
+      .filter_map(|connected_source| {
+        sources
+          .match_filter(connected_source.id, connected_source.name.as_str())
+          .map(|filter| (connected_source.id, filter, &connected_source.source))
+      })
+      .collect::<Vec<(SourceId, Filter, &Source)>>();
+
+    let mut filters = HashMap::<SourceId, Filter>::with_capacity(connected_sources.len());
+    let mut disconnected = input.connected.clone();
+
+    for (source_id, filter, source) in connected_sources {
+      filters.insert(source_id, filter);
+      if !input.connected.contains(&source_id) {
+        if let Ok(()) = input.port.connect_source(source, source_id) {
+          input.connected.insert(source_id);
+        }
+      } else {
+        disconnected.remove(&source_id);
+      }
+    }
+
+    for source_id in disconnected {
+      if let Some(source) = endpoints.get_source(source_id) {
+        input.port.disconnect_source(source).ok();
+      }
+    }
+
+    input.sources = sources;
+    input.filters.swap(Arc::new(filters));
+
+    Ok(())
+  }
+}
+
+impl CoreMidiDriver {
+  pub fn new(name: &str) -> Result<Self, drivers::Error> {
+    let endpoints = Arc::new(Mutex::new(Endpoints::new()));
+    let inputs = Arc::new(Mutex::new(HashMap::new()));
+    let callback = Self::notifications_callback(endpoints.clone(), inputs.clone());
+    let client =
+      Client::new_with_notifications(name, callback).map_err(CoreMidiError::ClientCreate)?;
+    Self::initialize_endpoints(endpoints.clone());
+
+    Ok(Self {
+      client,
+      endpoints,
+      inputs,
+    })
+  }
+
   fn create_input_port(
     &self,
     name: String,
-    mut handler: MidiInputHandler,
-    filters: Arc<ArcSwap<HashMap<SourceId, MidiFilter>>>,
-  ) -> Result<InputPortWithContext<SourceId>, Error> {
-    let default_filter = MidiFilter::none();
+    mut handler: InputHandler,
+    filters: Arc<ArcSwap<HashMap<SourceId, Filter>>>,
+  ) -> Result<InputPortWithContext<SourceId>, CoreMidiError> {
+    let default_filter = Filter::none();
     let mut decoder = DecoderProtocol2::default();
     self
       .client
@@ -197,15 +253,15 @@ impl Driver {
           );
         },
       )
-      .map_err(Error::PortCreate)
+      .map_err(CoreMidiError::PortCreate)
   }
 
   fn handle_input(
-    name: &str,
-    filters: &ArcSwap<HashMap<SourceId, MidiFilter>>,
-    default_filter: &MidiFilter,
+    _name: &str,
+    filters: &ArcSwap<HashMap<SourceId, Filter>>,
+    default_filter: &Filter,
     decoder: &mut DecoderProtocol2,
-    handler: &mut MidiInputHandler,
+    handler: &mut InputHandler,
     events: &EventList,
     source_id: SourceId,
   ) {
@@ -228,58 +284,6 @@ impl Driver {
         }
       }
     }
-  }
-
-  pub fn get_input_config(&self, name: &str) -> Option<MidiInputConfig> {
-    self.inputs.lock().get(name).map(|input| MidiInputConfig {
-      name: input.name.clone(),
-      sources: input.sources.clone(),
-    })
-  }
-
-  pub fn set_input_sources(&self, name: &str, sources: MidiSourceMatches) -> Result<(), Error> {
-    let endpoints = self.endpoints.lock();
-
-    let mut inputs = self.inputs.lock();
-
-    let input = inputs
-      .get_mut(name)
-      .ok_or_else(|| Error::InputNotFound(name.to_string()))?;
-
-    let connected_sources = endpoints
-      .connected_sources()
-      .into_iter()
-      .filter_map(|connected_source| {
-        sources
-          .match_filter(connected_source.id, connected_source.name.as_str())
-          .map(|filter| (connected_source.id, filter, &connected_source.source))
-      })
-      .collect::<Vec<(SourceId, MidiFilter, &Source)>>();
-
-    let mut filters = HashMap::<SourceId, MidiFilter>::with_capacity(connected_sources.len());
-    let mut disconnected = input.connected.clone();
-
-    for (source_id, filter, source) in connected_sources {
-      filters.insert(source_id, filter);
-      if !input.connected.contains(&source_id) {
-        if let Ok(()) = input.port.connect_source(source, source_id) {
-          input.connected.insert(source_id);
-        }
-      } else {
-        disconnected.remove(&source_id);
-      }
-    }
-
-    for source_id in disconnected {
-      if let Some(source) = endpoints.get_source(source_id) {
-        input.port.disconnect_source(&source).ok();
-      }
-    }
-
-    input.sources = sources;
-    input.filters.swap(Arc::new(filters));
-
-    Ok(())
   }
 
   fn notifications_callback(

@@ -2,4 +2,4 @@ mod driver;
 mod endpoints;
 mod timestamp;
 
-pub use driver::Driver;
+pub use driver::{CoreMidiDriver, CoreMidiError};

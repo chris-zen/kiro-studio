@@ -3,38 +3,38 @@ use std::fmt::{Debug, Formatter};
 
 use crate::event::MidiEvent;
 
-pub enum MidiInputHandler {
+pub enum InputHandler {
   Callback(Box<dyn FnMut(MidiEvent) + Send + 'static>),
   RingBuffer(Producer<MidiEvent>),
 }
 
-impl MidiInputHandler {
+impl InputHandler {
   pub(crate) fn call(&mut self, event: MidiEvent) {
     match self {
-      MidiInputHandler::Callback(ref mut callback) => (callback)(event),
-      MidiInputHandler::RingBuffer(ref mut producer) => {
+      InputHandler::Callback(ref mut callback) => (callback)(event),
+      InputHandler::RingBuffer(ref mut producer) => {
         producer.push(event).ok();
       }
     };
   }
 }
 
-impl<F> From<F> for MidiInputHandler
+impl<F> From<F> for InputHandler
 where
   F: FnMut(MidiEvent) + Send + 'static,
 {
   fn from(callback: F) -> Self {
-    MidiInputHandler::Callback(Box::new(callback))
+    InputHandler::Callback(Box::new(callback))
   }
 }
 
-impl From<Producer<MidiEvent>> for MidiInputHandler {
+impl From<Producer<MidiEvent>> for InputHandler {
   fn from(producer: Producer<MidiEvent>) -> Self {
-    MidiInputHandler::RingBuffer(producer)
+    InputHandler::RingBuffer(producer)
   }
 }
 
-impl Debug for MidiInputHandler {
+impl Debug for InputHandler {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::Callback(_) => write!(f, "Callback"),
@@ -57,7 +57,7 @@ mod tests {
     let state = Arc::new(AtomicU8::new(1));
     let state_clone = state.clone();
 
-    let mut handler = MidiInputHandler::from(move |event: MidiEvent| {
+    let mut handler = InputHandler::from(move |event: MidiEvent| {
       state_clone.store(event.message.group, Ordering::Relaxed)
     });
 
@@ -85,7 +85,7 @@ mod tests {
       },
     };
 
-    let mut handler = MidiInputHandler::from(producer);
+    let mut handler = InputHandler::from(producer);
 
     handler.call(event.clone());
 

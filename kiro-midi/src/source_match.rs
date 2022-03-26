@@ -1,16 +1,16 @@
 use regex::Regex;
 
 use crate::endpoints::SourceId;
-use crate::filter::MidiFilter;
+use crate::filter::Filter;
 
 #[derive(Debug, Clone)]
-pub enum MidiSourceMatch {
+pub enum SourceMatch {
   Id(SourceId),
   Name(String),
   Regex(Regex),
 }
 
-impl MidiSourceMatch {
+impl SourceMatch {
   pub fn regex(regex: &str) -> Result<Self, regex::Error> {
     Regex::new(regex).map(Self::Regex)
   }
@@ -24,43 +24,43 @@ impl MidiSourceMatch {
   }
 }
 
-impl From<SourceId> for MidiSourceMatch {
+impl From<SourceId> for SourceMatch {
   fn from(source_id: SourceId) -> Self {
     Self::Id(source_id)
   }
 }
 
-impl From<&str> for MidiSourceMatch {
+impl From<&str> for SourceMatch {
   fn from(name: &str) -> Self {
     Self::Name(name.to_string())
   }
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct MidiSourceMatches(Vec<(MidiSourceMatch, MidiFilter)>);
+pub struct SourceMatches(Vec<(SourceMatch, Filter)>);
 
-impl MidiSourceMatches {
-  pub fn new(matches: Vec<(MidiSourceMatch, MidiFilter)>) -> Self {
+impl SourceMatches {
+  pub fn new(matches: Vec<(SourceMatch, Filter)>) -> Self {
     Self(matches)
   }
 
   #[must_use]
-  pub fn with_source<M>(mut self, source_match: M, filter: MidiFilter) -> Self
+  pub fn with_source<M>(mut self, source_match: M, filter: Filter) -> Self
   where
-    M: Into<MidiSourceMatch>,
+    M: Into<SourceMatch>,
   {
     self.add_source(source_match.into(), filter);
     self
   }
 
-  pub fn add_source<M>(&mut self, source_match: M, filter: MidiFilter)
+  pub fn add_source<M>(&mut self, source_match: M, filter: Filter)
   where
-    M: Into<MidiSourceMatch>,
+    M: Into<SourceMatch>,
   {
     self.0.push((source_match.into(), filter));
   }
 
-  pub fn match_filter(&self, id: SourceId, name: &str) -> Option<MidiFilter> {
+  pub fn match_filter(&self, id: SourceId, name: &str) -> Option<Filter> {
     self
       .0
       .iter()

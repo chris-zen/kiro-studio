@@ -11,3 +11,6 @@ ringbuf = "0.2"
 kiro-midi = { path = "../kiro-midi" }
 kiro-audio = { path = "../kiro-audio" }
 kiro-engine = { path = "../kiro-engine" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.9.3"

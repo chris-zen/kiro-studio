@@ -16,6 +16,7 @@ impl<T> Ref<T> {
     Self { key, data }
   }
 
+  #[allow(clippy::mut_from_ref)]
   pub fn get_mut(&self) -> &mut T {
     unsafe { &mut *self.data.get() }
   }
@@ -67,7 +68,7 @@ impl<T> OwnedData<T> {
     self.data.len()
   }
 
-  pub fn keys<'a>(&'a self) -> impl Iterator<Item = Key<T>> + 'a {
+  pub fn keys(&self) -> impl Iterator<Item = Key<T>> + '_ {
     self.data.keys().cloned()
   }
 
