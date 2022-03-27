@@ -13,7 +13,7 @@ use crate::drivers;
 use crate::drivers::coremidi::endpoints::Endpoints;
 use crate::drivers::coremidi::timestamp::coremidi_timestamp_to_nanos;
 use crate::endpoints::{DestinationInfo, EndpointId, SourceId, SourceInfo};
-use crate::event::MidiEvent;
+use crate::event::Event;
 use crate::filter::Filter;
 use crate::input_config::InputConfig;
 use crate::input_handler::InputHandler;
@@ -234,7 +234,7 @@ impl CoreMidiDriver {
     mut handler: InputHandler,
     filters: Arc<ArcSwap<HashMap<SourceId, Filter>>>,
   ) -> Result<InputPortWithContext<SourceId>, CoreMidiError> {
-    let default_filter = Filter::none();
+    let default_filter = Filter::new();
     let mut decoder = DecoderProtocol2::default();
     self
       .client
@@ -275,7 +275,7 @@ impl CoreMidiDriver {
       let timestamp = coremidi_timestamp_to_nanos(event.timestamp());
       for word in event.data() {
         if let Ok(Some(message)) = decoder.next(*word, filter) {
-          let event = MidiEvent {
+          let event = Event {
             timestamp,
             endpoint: source_id,
             message,

@@ -1,11 +1,8 @@
 // mod allocator;
 pub mod buffer;
 
-pub use kiro_midi as midi;
-
-use crate::time::{BarsTime, ClockTime, Signature, Tempo, TicksTime};
-
-pub type EventTimestamp = TicksTime;
+use kiro_midi as midi;
+use kiro_time::{BarsTime, ClockTime, Signature, Tempo, TicksTime};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TransportMessage {
@@ -31,6 +28,6 @@ pub enum EventData {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Event {
-  pub timestamp: EventTimestamp,
+  pub timestamp: midi::TimestampNanos,
   pub data: EventData,
 }

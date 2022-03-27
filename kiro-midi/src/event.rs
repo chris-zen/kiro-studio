@@ -5,13 +5,13 @@ use std::fmt::Formatter;
 pub type TimestampNanos = u64;
 
 #[derive(Clone, PartialEq)]
-pub struct MidiEvent {
+pub struct Event {
   pub timestamp: TimestampNanos,
   pub endpoint: EndpointId,
   pub message: Message,
 }
 
-impl std::fmt::Debug for MidiEvent {
+impl std::fmt::Debug for Event {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     write!(
       f,

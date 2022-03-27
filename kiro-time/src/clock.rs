@@ -1,6 +1,6 @@
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
-use super::{SampleRate, Signature, Tempo, TicksTime};
+use crate::{SampleRate, Signature, Tempo, TicksTime};
 
 pub const MILLIS_PER_SECOND: u64 = 1_000;
 pub const NANOS_PER_SECOND: u64 = 1_000_000_000;
@@ -129,9 +129,9 @@ impl DivAssign<u32> for ClockTime {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
   use super::ClockTime;
-  use crate::time::clock::UNITS_PER_SECOND;
+  use crate::clock::UNITS_PER_SECOND;
 
   #[test]
   pub fn clock_time_new() {

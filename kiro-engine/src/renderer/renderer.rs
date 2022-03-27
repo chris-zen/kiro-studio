@@ -1,7 +1,7 @@
-use crate::audio::buffer::AudioBuffer;
-use crate::controller::owned_data::Ref;
 use ringbuf::{Consumer, Producer};
 
+use crate::audio::buffer::AudioBuffer;
+use crate::controller::owned_data::Ref;
 use crate::events::buffer::EventsBuffer;
 use crate::messages::Message;
 use crate::processor::context::ProcessorContext;

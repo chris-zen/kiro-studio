@@ -31,7 +31,7 @@ impl std::fmt::Display for Signature {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
   use super::Signature;
 

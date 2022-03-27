@@ -2,6 +2,7 @@
 members = [
     "kiro-audio",
     "kiro-midi",
+    "kiro-time",
     "kiro-engine",
     "kiro-studio",
 #    "kiro-synth",
@@ -10,8 +11,8 @@ members = [
 
 exclude = [
     "incubator",
-    "kiro-synth",
-    "kiro-synth-dsp"
+#    "kiro-synth",
+#    "kiro-synth-dsp"
 ]
 
 [profile.dev]

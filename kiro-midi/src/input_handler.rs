@@ -1,15 +1,15 @@
 use ringbuf::Producer;
 use std::fmt::{Debug, Formatter};
 
-use crate::event::MidiEvent;
+use crate::event::Event;
 
 pub enum InputHandler {
-  Callback(Box<dyn FnMut(MidiEvent) + Send + 'static>),
-  RingBuffer(Producer<MidiEvent>),
+  Callback(Box<dyn FnMut(Event) + Send + 'static>),
+  RingBuffer(Producer<Event>),
 }
 
 impl InputHandler {
-  pub(crate) fn call(&mut self, event: MidiEvent) {
+  pub(crate) fn call(&mut self, event: Event) {
     match self {
       InputHandler::Callback(ref mut callback) => (callback)(event),
       InputHandler::RingBuffer(ref mut producer) => {
@@ -21,15 +21,15 @@ impl InputHandler {
 
 impl<F> From<F> for InputHandler
 where
-  F: FnMut(MidiEvent) + Send + 'static,
+  F: FnMut(Event) + Send + 'static,
 {
   fn from(callback: F) -> Self {
     InputHandler::Callback(Box::new(callback))
   }
 }
 
-impl From<Producer<MidiEvent>> for InputHandler {
-  fn from(producer: Producer<MidiEvent>) -> Self {
+impl From<Producer<Event>> for InputHandler {
+  fn from(producer: Producer<Event>) -> Self {
     InputHandler::RingBuffer(producer)
   }
 }
@@ -57,11 +57,11 @@ mod tests {
     let state = Arc::new(AtomicU8::new(1));
     let state_clone = state.clone();
 
-    let mut handler = InputHandler::from(move |event: MidiEvent| {
+    let mut handler = InputHandler::from(move |event: Event| {
       state_clone.store(event.message.group, Ordering::Relaxed)
     });
 
-    handler.call(MidiEvent {
+    handler.call(Event {
       timestamp: 0,
       endpoint: 0,
       message: Message {
@@ -76,7 +76,7 @@ mod tests {
   #[test]
   fn from_ring_buffer() {
     let (mut producer, mut consumer) = ringbuf::RingBuffer::new(1).split();
-    let event = MidiEvent {
+    let event = Event {
       timestamp: 0,
       endpoint: 0,
       message: Message {

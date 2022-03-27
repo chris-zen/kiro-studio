@@ -1,4 +1,4 @@
-use crate::time::{BarsTime, ClockTime, SampleRate, Signature, Tempo, TicksTime};
+use crate::{BarsTime, ClockTime, SampleRate, Signature, Tempo, TicksTime};
 
 const SECONDS_PER_MINUTE: f64 = 60.0;
 
@@ -66,7 +66,7 @@ impl TicksDriftCorrection {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
   use super::TicksDriftCorrection;
   use super::{Signature, Tempo, TicksTime};

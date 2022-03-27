@@ -1,4 +1,4 @@
-use crate::time::{clock, ClockTime, SampleRate};
+use crate::{clock, ClockTime, SampleRate};
 
 #[derive(Clone)]
 pub struct ClockDriftCorrection {
@@ -56,7 +56,7 @@ impl ClockDriftCorrection {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
   use super::ClockDriftCorrection;
   use super::ClockTime;

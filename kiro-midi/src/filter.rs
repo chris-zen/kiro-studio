@@ -8,7 +8,7 @@ pub struct Filter {
 }
 
 impl Filter {
-  pub fn none() -> Self {
+  pub fn new() -> Self {
     Self {
       mtypes: 0xffff,
       groups: 0xffff,
@@ -66,7 +66,7 @@ impl Filter {
 
 impl Default for Filter {
   fn default() -> Self {
-    Self::none()
+    Self::new()
   }
 }
 

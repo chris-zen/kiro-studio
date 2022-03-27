@@ -103,7 +103,7 @@ mod tests {
 
   #[test]
   fn first_word_does_not_emit() {
-    let filter = Filter::none();
+    let filter = Filter::new();
     let mut decoder = DecoderProtocol2::default();
 
     let result = decoder.next(0x40903c00, &filter);
@@ -117,7 +117,7 @@ mod tests {
 
   #[test]
   fn last_word_emits() {
-    let filter = Filter::none();
+    let filter = Filter::new();
     let mut decoder = DecoderProtocol2::default();
 
     decoder.next(0x41923c00, &filter);
@@ -142,7 +142,7 @@ mod tests {
 
   #[test]
   fn two_messages_are_emitted() {
-    let filter = Filter::none();
+    let filter = Filter::new();
     let mut decoder = DecoderProtocol2::default();
 
     decoder.next(0x41923c00, &filter);

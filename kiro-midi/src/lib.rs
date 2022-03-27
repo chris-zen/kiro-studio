@@ -9,7 +9,8 @@ pub mod note_freq;
 pub(crate) mod protocol;
 pub(crate) mod source_match;
 
-pub use event::{MidiEvent, TimestampNanos};
+pub use drivers::{Driver, DriverSpec};
+pub use event::{Event, TimestampNanos};
 pub use filter::Filter;
 pub use input_config::InputConfig;
 pub use input_handler::InputHandler;

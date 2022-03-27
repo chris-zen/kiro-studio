@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::time::{ticks::TICKS_RESOLUTION, Signature, TicksTime};
+use crate::{ticks::TICKS_RESOLUTION, Signature, TicksTime};
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct BarsTime {
@@ -80,10 +80,10 @@ impl fmt::Debug for BarsTime {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
-  use super::BarsTime;
-  use crate::time::{ticks::TicksTime, ticks::TICKS_RESOLUTION, Signature};
+  use super::{BarsTime, Signature};
+  use crate::ticks::{TicksTime, TICKS_RESOLUTION};
 
   #[test]
   pub fn new() {

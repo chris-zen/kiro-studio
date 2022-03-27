@@ -1,6 +1,15 @@
 use thiserror::Error;
 
-#[derive(Debug, Clone, Copy, Error)]
-pub enum Error {}
+use kiro_midi as midi;
+use kiro_audio as audio;
+
+#[derive(Debug, Error)]
+pub enum Error {
+  #[error("Midi: {0}")]
+  Midi(#[from] midi::drivers::Error),
+
+  #[error("Audio: {0}")]
+  Audio(#[from] audio::AudioError),
+}
 
 pub type Result<T> = core::result::Result<T, Error>;

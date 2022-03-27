@@ -9,5 +9,6 @@ thiserror = "~1.0"
 anyhow = "~1.0"
 ringbuf = "~0.2"
 
+kiro-time = { path = "../kiro-time" }
 kiro-midi = { path = "../kiro-midi" }
 kiro-audio = { path = "../kiro-audio" }

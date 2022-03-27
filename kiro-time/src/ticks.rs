@@ -3,7 +3,7 @@ use std::{
   ops::{Add, AddAssign, Div, Mul, Sub, SubAssign},
 };
 
-use crate::time::{clock, ClockTime, Signature, Tempo};
+use crate::{clock, ClockTime, Signature, Tempo};
 
 pub const TICKS_RESOLUTION: u64 = 508_032_000; // 2^10 * 3^4 * 5^3 * 7^2
 
@@ -110,10 +110,11 @@ impl From<TicksTime> for u64 {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
+
+  use std::cmp::Ordering;
 
   use super::{clock, Signature, Tempo, TicksTime};
-  use std::cmp::Ordering;
 
   #[test]
   pub fn new() {
