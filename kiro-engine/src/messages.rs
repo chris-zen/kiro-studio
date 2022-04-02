@@ -1,4 +1,4 @@
-use crate::renderer::plan::RenderPlan;
+use crate::callback::plan::RenderPlan;
 
 // #[derive(Debug, Clone)]
 pub enum Message {

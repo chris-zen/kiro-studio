@@ -1,11 +1,11 @@
 use ringbuf::{Consumer, Producer};
 
 use crate::audio::buffer::AudioBuffer;
+use crate::callback::plan::RenderPlan;
 use crate::controller::owned_data::Ref;
 use crate::events::buffer::EventsBuffer;
 use crate::messages::Message;
 use crate::processor::context::ProcessorContext;
-use crate::renderer::plan::RenderPlan;
 use crate::EngineConfig;
 
 pub struct Renderer {

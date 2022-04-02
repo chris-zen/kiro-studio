@@ -4,6 +4,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use crate::audio::buffer::AudioBuffer;
+use crate::callback::plan::{RenderNode, RenderPlan};
 use crate::controller::owned_data::{OwnedData, Ref};
 use crate::events::buffer::EventsBuffer;
 use crate::key_gen::Key;
@@ -13,7 +14,6 @@ use crate::processor::ports::audio::AudioPort;
 use crate::processor::ports::events::EventsPort;
 use crate::processor::ports::{Input, Output};
 use crate::processor::BoxedProcessor;
-use crate::renderer::plan::{RenderNode, RenderPlan};
 use crate::{EngineConfig, ParamValue, PlanNode, Processor};
 
 pub type ProcessorKey = Key<BoxedProcessor>;

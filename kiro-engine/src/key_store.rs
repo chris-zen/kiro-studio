@@ -64,7 +64,18 @@ impl<T> KeyStore<T> {
     self.data.iter().map(|(key, value)| (*key, value))
   }
 
-  // TODO remove an element
+  pub fn remove(&mut self, key: Key<T>) -> Option<T> {
+    self.data.remove(&key)
+  }
+}
+
+impl<T> PartialEq for KeyStore<T>
+where
+  T: PartialEq,
+{
+  fn eq(&self, other: &Self) -> bool {
+    self.data.eq(&other.data)
+  }
 }
 
 #[derive(Debug)]
@@ -138,11 +149,14 @@ impl<T: HasId> KeyStoreWithId<T> {
 
   #[inline]
   pub fn iter(&self) -> impl Iterator<Item = (Key<T>, &T)> {
-    self
-      .key_store
-      .iter()
-      .map(|(key, value)| (key, value))
+    self.key_store.iter().map(|(key, value)| (key, value))
   }
 
-  // TODO remove an element
+  pub fn remove(&mut self, key: Key<T>) -> Option<T> {
+    let maybe_item = self.key_store.remove(key);
+    if let Some(item) = maybe_item.as_ref() {
+      self.keys_by_id.remove(item.id());
+    }
+    maybe_item
+  }
 }
