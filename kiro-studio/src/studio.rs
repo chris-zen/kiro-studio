@@ -1,12 +1,12 @@
 use ringbuf::Consumer;
 
 use kiro_audio as audio;
-use kiro_engine::{Controller, Engine, EngineConfig, Renderer};
 use kiro_engine::events::{Event, EventData};
+use kiro_engine::{Controller, Engine, EngineConfig, Renderer};
 use kiro_midi::{self as midi, Driver, DriverSpec};
 
 use crate::config::Config;
-use crate::errors::{Error, Result};
+use crate::errors::Result;
 
 pub struct Studio {
   config: Config,
@@ -19,8 +19,12 @@ impl Studio {
   pub fn new(config: Config) -> Result<Self> {
     let mut midi_driver = midi::drivers::create("kiro-studio")?;
 
-    let (midi_track_producer, midi_track_consumer) = ringbuf::RingBuffer::new(config.midi.ringbuf_size).split();
-    midi_driver.create_input(midi::InputConfig::new("track").with_all_sources(midi::Filter::default()), midi_track_producer)?;
+    let (midi_track_producer, midi_track_consumer) =
+      ringbuf::RingBuffer::new(config.midi.ringbuf_size).split();
+    midi_driver.create_input(
+      midi::InputConfig::new("track").with_all_sources(midi::Filter::default()),
+      midi_track_producer,
+    )?;
 
     let audio_config = audio::AudioConfig::default();
     let sample_rate = audio_config.sample_rate as f32;

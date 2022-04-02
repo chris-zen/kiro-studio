@@ -1,7 +1,7 @@
 use thiserror::Error;
 
-use kiro_midi as midi;
 use kiro_audio as audio;
+use kiro_midi as midi;
 
 #[derive(Debug, Error)]
 pub enum Error {
