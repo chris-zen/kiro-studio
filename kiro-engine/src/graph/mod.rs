@@ -7,8 +7,8 @@ mod port;
 use std::cell::RefCell;
 use std::rc::Rc;
 use thiserror::Error;
-use crate::graph::inner::InnerGraph;
 
+use crate::graph::inner::InnerGraph;
 use crate::graph::port::HasPorts;
 use crate::graph::port::PortDescriptor;
 

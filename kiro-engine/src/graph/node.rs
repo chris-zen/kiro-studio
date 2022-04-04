@@ -75,4 +75,20 @@ impl NodeDescriptor {
     self.parameters = params;
     self
   }
+
+  pub fn with_audio_ports<F>(mut self, f: F) -> Self
+  where
+    F: FnOnce(DescriptorPorts<AudioDescriptor>) -> DescriptorPorts<AudioDescriptor>,
+  {
+    self.audio_ports = f(self.audio_ports);
+    self
+  }
+
+  pub fn with_events_ports<F>(mut self, f: F) -> Self
+  where
+    F: FnOnce(DescriptorPorts<EventsDescriptor>) -> DescriptorPorts<EventsDescriptor>,
+  {
+    self.events_ports = f(self.events_ports);
+    self
+  }
 }

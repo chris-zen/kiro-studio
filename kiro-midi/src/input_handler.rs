@@ -45,10 +45,12 @@ impl Debug for InputHandler {
 
 #[cfg(test)]
 mod tests {
-  use crate::protocol::messages::utility::Utility;
-  use crate::protocol::messages::MessageType;
+  use crate::messages::Message;
   use std::sync::atomic::{AtomicU8, Ordering};
   use std::sync::Arc;
+
+  use crate::protocol::messages::utility::Utility;
+  use crate::protocol::messages::MessageType;
 
   use super::*;
 
