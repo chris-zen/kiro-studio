@@ -1,7 +1,11 @@
 use std::collections::HashSet;
 
+use crate::graph::error::{Error, Result};
 use crate::graph::node::NodeKey;
-use crate::graph::port::{AudioDescriptor, DescriptorPorts, EventsDescriptor, HasPorts, Ports};
+use crate::graph::port::{
+  AudioDescriptor, AudioOutputPort, AudioOutputPortKey, DescriptorPorts, EventsDescriptor,
+  NodeLike, Ports,
+};
 use crate::key_gen::Key;
 
 pub type ModuleKey = Key<Module>;
@@ -11,6 +15,7 @@ pub struct Module {
   pub name: String,
   pub descriptor: ModuleDescriptor,
   pub parent: Option<ModuleKey>,
+  pub path: String,
   pub nodes: HashSet<NodeKey>,
   pub ports: Ports,
 }
@@ -20,6 +25,7 @@ impl Module {
     name: S,
     descriptor: ModuleDescriptor,
     parent: Option<ModuleKey>,
+    path: String,
   ) -> Self {
     let ports = Ports::new(
       descriptor.audio_ports.static_inputs.as_slice(),
@@ -32,13 +38,18 @@ impl Module {
       name: name.into(),
       descriptor,
       parent,
+      path,
       nodes: HashSet::new(),
       ports,
     }
   }
 }
 
-impl HasPorts for Module {
+impl NodeLike for Module {
+  fn full_name(&self) -> String {
+    format!("{}::{}", self.path, self.name)
+  }
+
   fn get_audio_descriptor_ports(&self) -> &DescriptorPorts<AudioDescriptor> {
     &self.descriptor.audio_ports
   }

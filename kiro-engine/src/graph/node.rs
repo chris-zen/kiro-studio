@@ -1,6 +1,6 @@
 use crate::graph::module::ModuleKey;
 use crate::graph::param::ParamDescriptor;
-use crate::graph::port::{AudioDescriptor, DescriptorPorts, EventsDescriptor, HasPorts, Ports};
+use crate::graph::port::{AudioDescriptor, DescriptorPorts, EventsDescriptor, NodeLike, Ports};
 use crate::key_gen::Key;
 
 pub type NodeKey = Key<Node>;
@@ -10,11 +10,17 @@ pub struct Node {
   pub name: String,
   pub descriptor: NodeDescriptor,
   pub module: ModuleKey,
+  pub path: String,
   pub ports: Ports,
 }
 
 impl Node {
-  pub fn new<S: Into<String>>(name: S, descriptor: NodeDescriptor, module: ModuleKey) -> Self {
+  pub fn new<S: Into<String>>(
+    name: S,
+    descriptor: NodeDescriptor,
+    module: ModuleKey,
+    path: String,
+  ) -> Self {
     let ports = Ports::new(
       descriptor.audio_ports.static_inputs.as_slice(),
       descriptor.audio_ports.static_outputs.as_slice(),
@@ -26,12 +32,17 @@ impl Node {
       name: name.into(),
       descriptor,
       module,
+      path,
       ports,
     }
   }
 }
 
-impl HasPorts for Node {
+impl NodeLike for Node {
+  fn full_name(&self) -> String {
+    format!("{}::{}", self.path, self.name)
+  }
+
   fn get_audio_descriptor_ports(&self) -> &DescriptorPorts<AudioDescriptor> {
     &self.descriptor.audio_ports
   }

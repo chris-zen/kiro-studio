@@ -1,29 +1,16 @@
 #![allow(clippy::wrong_self_convention)]
 
-use thiserror::Error;
-
+use crate::graph::connection::{
+  AudioConnection, EventsConnection, ModuleAudioIn, ModuleAudioOut, ModuleEventsIn,
+  ModuleEventsOut, ModuleIn, ModuleOut, NodeAudioIn, NodeAudioOut, NodeEventsIn, NodeEventsOut,
+  NodeIn, NodeOut,
+};
+use crate::graph::error::{Error, Result};
 use crate::graph::module::{Module, ModuleDescriptor, ModuleKey};
 use crate::graph::node::{Node, NodeDescriptor, NodeKey};
-use crate::graph::port::{
-  AudioDescriptor, DynamicPorts, EventsDescriptor, HasPorts, InputPortKey, OutputPort,
-  OutputPortKey, PortType,
-};
+use crate::graph::port::{AudioDescriptor, AudioOutputPort, AudioOutputPortKey, DynamicPorts, EventsDescriptor, InputPortKey, InputSource, NodeLike, OutputPort, OutputPortKey, OutputSource, port_path, PortType};
 use crate::graph::port::{InputPort, PortDescriptor};
-use crate::key_store::KeyStore;
-
-pub type Result<T> = core::result::Result<T, Error>;
-
-#[derive(Debug, Error)]
-pub enum Error {
-  #[error("Module not found: {0}")]
-  ModuleNotFound(ModuleKey),
-
-  #[error("Node not found: {0}")]
-  NodeNotFound(NodeKey),
-
-  #[error("Dynamic ports not available")]
-  DynamicPortsNotAvailable,
-}
+use crate::key_store::{HasId, KeyStore};
 
 pub struct InnerGraph {
   root_module: ModuleKey,
@@ -35,7 +22,12 @@ impl InnerGraph {
   /// Create a new inner graph with a root module
   pub fn new() -> Self {
     let mut modules = KeyStore::new();
-    let root_module = modules.add(Module::new("root", ModuleDescriptor::new(), None));
+    let root_module = modules.add(Module::new(
+      "root",
+      ModuleDescriptor::new(),
+      None,
+      String::new(),
+    ));
     Self {
       root_module,
       modules,
@@ -52,15 +44,17 @@ impl InnerGraph {
   /// It will create all the ports declared in the descriptor as static ports.
   pub fn create_module(
     &mut self,
-    parent: ModuleKey,
+    parent_key: ModuleKey,
     name: &str,
     descriptor: ModuleDescriptor,
   ) -> Result<ModuleKey> {
-    if self.modules.contains_key(parent) {
-      let module = Module::new(name, descriptor, Some(parent));
+    if self.modules.contains_key(parent_key) {
+      let parent = self.get_module(parent_key)?;
+      let path = format!("{}/{}", parent.path, parent.name);
+      let module = Module::new(name, descriptor, Some(parent_key), path);
       Ok(self.modules.add(module))
     } else {
-      Err(Error::ModuleNotFound(parent))
+      Err(Error::ModuleNotFound(parent_key))
     }
   }
 
@@ -116,7 +110,7 @@ impl InnerGraph {
       .then(|| {
         let port_key = module.ports.audio_output_ports.add(OutputPort {
           descriptor,
-          destinations: Vec::new(),
+          source: None,
         });
         ModuleOut(module_key, port_key)
       })
@@ -154,7 +148,7 @@ impl InnerGraph {
       .then(|| {
         let port_key = module.ports.events_output_ports.add(OutputPort {
           descriptor,
-          destinations: Vec::new(),
+          source: None,
         });
         ModuleOut(module_key, port_key)
       })
@@ -217,15 +211,17 @@ impl InnerGraph {
   /// It will create all the ports declared in the descriptor as static ports.
   pub fn create_node(
     &mut self,
-    parent: ModuleKey,
+    parent_key: ModuleKey,
     name: &str,
     descriptor: NodeDescriptor,
   ) -> Result<NodeKey> {
-    if self.modules.contains_key(parent) {
-      let node = Node::new(name, descriptor, parent);
+    if self.modules.contains_key(parent_key) {
+      let parent = self.get_module(parent_key)?;
+      let path = format!("{}/{}", parent.path, parent.name);
+      let node = Node::new(name, descriptor, parent_key, path);
       Ok(self.nodes.add(node))
     } else {
-      Err(Error::ModuleNotFound(parent))
+      Err(Error::ModuleNotFound(parent_key))
     }
   }
 
@@ -323,7 +319,7 @@ impl InnerGraph {
       .then(|| {
         let port_key = node.ports.audio_output_ports.add(OutputPort {
           descriptor,
-          destinations: Vec::new(),
+          source: None,
         });
         NodeOut(node_key, port_key)
       })
@@ -361,18 +357,64 @@ impl InnerGraph {
       .then(|| {
         let port_key = node.ports.events_output_ports.add(OutputPort {
           descriptor,
-          destinations: Vec::new(),
+          source: None,
         });
         NodeOut(node_key, port_key)
       })
       .ok_or(Error::DynamicPortsNotAvailable)
   }
 
-  pub fn connect_audio(&mut self, connection: AudioConnection) -> Result<()> {
-    todo!()
+  fn module_path(&self, module_key: ModuleKey) -> Result<Vec<String>> {
+    let module = self.get_module(module_key)?;
+    match module.parent {
+      Some(parent) => {
+        let mut path = self.module_path(parent)?;
+        path.push(module.name.clone());
+        Ok(path)
+      }
+      None => Ok(vec![module.name.clone()]),
+    }
   }
 
-  pub fn connect_events(&mut self, connection: AudioConnection) -> Result<()> {
+  pub fn connect_audio(&mut self, connection: AudioConnection) -> Result<()> {
+    match connection {
+      AudioConnection::ModuleOutBindModuleOut(mut src_module_out, mut dst_module_out) => {
+        let mut dst_module = self.get_module(dst_module_out.module_key())?;
+        let mut dst_port = dst_module.get_audio_output_port(dst_module_out.output_port_key())?;
+
+        let mut src_module = self.get_module(src_module_out.module_key())?;
+        let mut src_port = src_module.get_audio_output_port(src_module_out.output_port_key())?;
+
+        if src_module.parent != Some(dst_module_out.module_key()) {
+          if dst_module.parent == Some(src_module_out.module_key()) {
+            std::mem::swap(&mut src_module_out, &mut dst_module_out);
+            std::mem::swap(&mut src_module, &mut dst_module);
+            std::mem::swap(&mut src_port, &mut dst_port);
+          } else {
+            let src_path = port_path(src_module, src_port);
+            let dst_path = port_path(dst_module, dst_port);
+            Err(Error::BindingOutOfScope(src_path, dst_path))?
+          }
+        }
+
+        if dst_port.source.is_some() {
+          let dst_path = port_path(dst_module, dst_port);
+          Err(Error::AudioOutputSourceAlreadyDefined(dst_path))
+        } else {
+          let dst_module = self.get_module_mut(dst_module_out.module_key())?;
+          let dst_port = dst_module.get_audio_output_port_mut(dst_module_out.output_port_key())?;
+          dst_port.source = Some(OutputSource::ModuleBinding(src_module_out));
+          Ok(())
+        }
+      }
+      AudioConnection::NodeOutBindModuleOut(src_nout, dst_mout) => {
+        todo!()
+      }
+      _ => todo!(),
+    }
+  }
+
+  pub fn connect_events(&mut self, connection: EventsConnection) -> Result<()> {
     todo!()
   }
 
@@ -394,7 +436,7 @@ impl InnerGraph {
 
   fn enough_dynamic_input_ports<P, D>(entity: &mut P, descriptor: &D) -> bool
   where
-    P: HasPorts,
+    P: NodeLike,
     D: PortDescriptor,
   {
     let dynamic_port = match descriptor.port_type() {
@@ -427,7 +469,7 @@ impl InnerGraph {
 
   fn enough_dynamic_output_ports<P, D>(entity: &mut P, descriptor: &D) -> bool
   where
-    P: HasPorts,
+    P: NodeLike,
     D: PortDescriptor,
   {
     let dynamic_port = match descriptor.port_type() {
@@ -456,246 +498,6 @@ impl InnerGraph {
       }
       DynamicPorts::Unlimited => true,
     }
-  }
-}
-
-pub type AudioConnection = Connection<AudioDescriptor>;
-pub type EventsConnection = Connection<EventsDescriptor>;
-
-pub enum Connection<D> {
-  ModuleOutBindModuleOut(ModuleOut<D>, ModuleOut<D>),
-  ModuleOutToModuleIn(ModuleOut<D>, ModuleIn<D>),
-  ModuleOutToNodeIn(ModuleOut<D>, NodeIn<D>),
-  ModuleInBindModuleIn(ModuleIn<D>, ModuleIn<D>),
-  ModuleInBindNodeIn(ModuleIn<D>, NodeIn<D>),
-  NodeOutBindModuleOut(NodeOut<D>, ModuleOut<D>),
-  NodeOutToModuleIn(NodeOut<D>, ModuleIn<D>),
-  NodeOutToNodeIn(NodeOut<D>, NodeIn<D>),
-}
-
-pub type ModuleAudioIn = ModuleIn<AudioDescriptor>;
-pub type ModuleAudioOut = ModuleOut<AudioDescriptor>;
-pub type NodeAudioIn = NodeIn<AudioDescriptor>;
-pub type NodeAudioOut = NodeOut<AudioDescriptor>;
-
-pub type ModuleEventsIn = ModuleIn<EventsDescriptor>;
-pub type ModuleEventsOut = ModuleOut<EventsDescriptor>;
-pub type NodeEventsIn = NodeIn<EventsDescriptor>;
-pub type NodeEventsOut = NodeOut<EventsDescriptor>;
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ModuleIn<D>(ModuleKey, InputPortKey<D>);
-
-impl<D> Copy for ModuleIn<D> where D: PortDescriptor {}
-
-impl<D> ModuleIn<D>
-where
-  D: PortDescriptor,
-{
-  pub fn bind<B>(self, other: B) -> Connection<D>
-  where
-    B: Into<ModuleInBind<D>>,
-  {
-    match other.into() {
-      ModuleInBind::ModuleIn(module_in) => Connection::ModuleInBindModuleIn(self, module_in),
-      ModuleInBind::NodeIn(node_in) => Connection::ModuleInBindNodeIn(self, node_in),
-    }
-  }
-
-  pub fn from<S>(self, other: S) -> Connection<D>
-  where
-    S: Into<ModuleInFrom<D>>,
-  {
-    match other.into() {
-      ModuleInFrom::ModuleOut(module_out) => Connection::ModuleOutToModuleIn(module_out, self),
-      ModuleInFrom::NodeOut(node_out) => Connection::NodeOutToModuleIn(node_out, self),
-    }
-  }
-}
-
-pub enum ModuleInBind<D> {
-  ModuleIn(ModuleIn<D>),
-  NodeIn(NodeIn<D>),
-}
-
-impl<D> From<ModuleIn<D>> for ModuleInBind<D> {
-  fn from(value: ModuleIn<D>) -> Self {
-    ModuleInBind::ModuleIn(value)
-  }
-}
-
-impl<D> From<NodeIn<D>> for ModuleInBind<D> {
-  fn from(value: NodeIn<D>) -> Self {
-    ModuleInBind::NodeIn(value)
-  }
-}
-
-pub enum ModuleInFrom<D> {
-  ModuleOut(ModuleOut<D>),
-  NodeOut(NodeOut<D>),
-}
-
-impl<D> From<ModuleOut<D>> for ModuleInFrom<D> {
-  fn from(value: ModuleOut<D>) -> Self {
-    ModuleInFrom::ModuleOut(value)
-  }
-}
-
-impl<D> From<NodeOut<D>> for ModuleInFrom<D> {
-  fn from(value: NodeOut<D>) -> Self {
-    ModuleInFrom::NodeOut(value)
-  }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ModuleOut<D>(ModuleKey, OutputPortKey<D>);
-
-impl<D> Copy for ModuleOut<D> where D: PortDescriptor {}
-
-impl<D> ModuleOut<D>
-where
-  D: PortDescriptor,
-{
-  pub fn bind(self, other: ModuleOut<D>) -> Connection<D> {
-    Connection::ModuleOutBindModuleOut(self, other)
-  }
-
-  pub fn to<C>(self, other: C) -> Connection<D>
-  where
-    C: Into<ModuleOutTo<D>>,
-  {
-    match other.into() {
-      ModuleOutTo::ModuleIn(module_in) => Connection::ModuleOutToModuleIn(self, module_in),
-      ModuleOutTo::NodeIn(node_in) => Connection::ModuleOutToNodeIn(self, node_in),
-    }
-  }
-
-  pub fn bind_from<B>(self, other: B) -> Connection<D>
-  where
-    B: Into<ModuleOutBindFrom<D>>,
-  {
-    match other.into() {
-      ModuleOutBindFrom::ModuleOut(module_out) => {
-        Connection::ModuleOutBindModuleOut(module_out, self)
-      }
-      ModuleOutBindFrom::NodeOut(node_out) => Connection::NodeOutBindModuleOut(node_out, self),
-    }
-  }
-}
-
-pub enum ModuleOutTo<D> {
-  ModuleIn(ModuleIn<D>),
-  NodeIn(NodeIn<D>),
-}
-
-impl<D> From<ModuleIn<D>> for ModuleOutTo<D> {
-  fn from(value: ModuleIn<D>) -> Self {
-    ModuleOutTo::ModuleIn(value)
-  }
-}
-
-impl<D> From<NodeIn<D>> for ModuleOutTo<D> {
-  fn from(value: NodeIn<D>) -> Self {
-    ModuleOutTo::NodeIn(value)
-  }
-}
-
-pub enum ModuleOutBindFrom<D> {
-  ModuleOut(ModuleOut<D>),
-  NodeOut(NodeOut<D>),
-}
-
-impl<D> From<ModuleOut<D>> for ModuleOutBindFrom<D> {
-  fn from(value: ModuleOut<D>) -> Self {
-    ModuleOutBindFrom::ModuleOut(value)
-  }
-}
-
-impl<D> From<NodeOut<D>> for ModuleOutBindFrom<D> {
-  fn from(value: NodeOut<D>) -> Self {
-    ModuleOutBindFrom::NodeOut(value)
-  }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct NodeIn<D>(NodeKey, InputPortKey<D>);
-
-impl<D> Copy for NodeIn<D> where D: PortDescriptor {}
-
-impl<D> NodeIn<D>
-where
-  D: PortDescriptor,
-{
-  pub fn bind_from(self, other: ModuleIn<D>) -> Connection<D> {
-    Connection::ModuleInBindNodeIn(other, self)
-  }
-
-  pub fn from<C>(self, other: C) -> Connection<D>
-  where
-    C: Into<NodeInFrom<D>>,
-  {
-    match other.into() {
-      NodeInFrom::ModuleOut(module_out) => Connection::ModuleOutToNodeIn(module_out, self),
-      NodeInFrom::NodeOut(node_out) => Connection::NodeOutToNodeIn(node_out, self),
-    }
-  }
-}
-
-pub enum NodeInFrom<D> {
-  ModuleOut(ModuleOut<D>),
-  NodeOut(NodeOut<D>),
-}
-
-impl<D> From<ModuleOut<D>> for NodeInFrom<D> {
-  fn from(value: ModuleOut<D>) -> Self {
-    NodeInFrom::ModuleOut(value)
-  }
-}
-
-impl<D> From<NodeOut<D>> for NodeInFrom<D> {
-  fn from(value: NodeOut<D>) -> Self {
-    NodeInFrom::NodeOut(value)
-  }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct NodeOut<D>(NodeKey, OutputPortKey<D>);
-
-impl<D> Copy for NodeOut<D> where D: PortDescriptor {}
-
-impl<D> NodeOut<D>
-where
-  D: PortDescriptor,
-{
-  pub fn bind(self, other: ModuleOut<D>) -> Connection<D> {
-    Connection::NodeOutBindModuleOut(self, other)
-  }
-
-  pub fn to<C>(self, other: C) -> Connection<D>
-  where
-    C: Into<NodeOutTo<D>>,
-  {
-    match other.into() {
-      NodeOutTo::ModuleIn(module_in) => Connection::NodeOutToModuleIn(self, module_in),
-      NodeOutTo::NodeIn(node_in) => Connection::NodeOutToNodeIn(self, node_in),
-    }
-  }
-}
-
-pub enum NodeOutTo<D> {
-  ModuleIn(ModuleIn<D>),
-  NodeIn(NodeIn<D>),
-}
-
-impl<D> From<ModuleIn<D>> for NodeOutTo<D> {
-  fn from(value: ModuleIn<D>) -> Self {
-    NodeOutTo::ModuleIn(value)
-  }
-}
-
-impl<D> From<NodeIn<D>> for NodeOutTo<D> {
-  fn from(value: NodeIn<D>) -> Self {
-    NodeOutTo::NodeIn(value)
   }
 }
 

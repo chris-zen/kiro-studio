@@ -1,5 +1,5 @@
-use crate::graph::module::ModuleKey;
-use crate::graph::node::NodeKey;
+use crate::graph::connection::{ModuleIn, ModuleOut, NodeOut};
+use crate::graph::error::{Error, Result};
 use crate::key_gen::Key;
 use crate::key_store::{HasId, KeyStore};
 
@@ -21,43 +21,44 @@ pub type EventsOutputPort = OutputPort<EventsDescriptor>;
 #[derive(Debug, Clone, PartialEq)]
 pub struct InputPort<D> {
   pub descriptor: D,
-  pub source: Option<Source<D>>,
+  pub source: Option<InputSource<D>>,
+}
+
+impl<D> HasId for InputPort<D>
+where
+  D: HasId,
+{
+  fn id(&self) -> &str {
+    self.descriptor.id()
+  }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum InputSource<D> {
+  ModuleBinding(ModuleIn<D>),
+  ModuleConnection(ModuleOut<D>),
+  NodeConnection(NodeOut<D>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct OutputPort<D> {
   pub descriptor: D,
-  pub destinations: Vec<Destination<D>>,
+  pub source: Option<OutputSource<D>>,
+}
+
+impl<D> HasId for OutputPort<D>
+where
+  D: HasId,
+{
+  fn id(&self) -> &str {
+    self.descriptor.id()
+  }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Source<D> {
-  Binding(SourceBinding<D>),
-  Connection(SourceConnection<D>),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct SourceBinding<D>(pub ModuleKey, pub InputPortKey<D>);
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum SourceConnection<D> {
-  Node(NodeKey, OutputPortKey<D>),
-  Module(ModuleKey, OutputPortKey<D>),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Destination<D> {
-  Binding(DestinationBinding<D>),
-  Connection(DestinationConnection<D>),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct DestinationBinding<D>(pub ModuleKey, pub OutputPortKey<D>);
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum DestinationConnection<D> {
-  Node(NodeKey, InputPortKey<D>),
-  Module(ModuleKey, InputPortKey<D>),
+pub enum OutputSource<D> {
+  ModuleBinding(ModuleOut<D>),
+  NodeBinding(NodeOut<D>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -87,7 +88,7 @@ impl Ports {
     for descriptor in audio_output.iter() {
       audio_output_ports.add(AudioOutputPort {
         descriptor: descriptor.clone(),
-        destinations: Vec::new(),
+        source: None,
       });
     }
 
@@ -103,7 +104,7 @@ impl Ports {
     for descriptor in events_output.iter() {
       events_output_ports.add(EventsOutputPort {
         descriptor: descriptor.clone(),
-        destinations: Vec::new(),
+        source: None,
       });
     }
 
@@ -268,10 +269,62 @@ where
   }
 }
 
-pub trait HasPorts {
+pub trait NodeLike {
+  fn full_name(&self) -> String;
+
   fn get_audio_descriptor_ports(&self) -> &DescriptorPorts<AudioDescriptor>;
   fn get_events_descriptor_ports(&self) -> &DescriptorPorts<EventsDescriptor>;
 
   fn get_ports(&self) -> &Ports;
   fn get_ports_mut(&mut self) -> &mut Ports;
+
+  fn get_audio_input_port(&self, port_key: AudioInputPortKey) -> Result<&AudioInputPort> {
+    self
+      .get_ports()
+      .audio_input_ports
+      .get(port_key)
+      .ok_or_else(|| Error::AudioInputPortNotFound(self.full_name(), port_key))
+  }
+
+  fn get_audio_input_port_mut(
+    &mut self,
+    port_key: AudioInputPortKey,
+  ) -> Result<&mut AudioInputPort> {
+    // See this for further info on why this needs to be that convoluted:
+    // https://github.com/rust-lang/rfcs/blob/master/text/2094-nll.md#problem-case-3-conditional-control-flow-across-functions
+    if self.get_ports().audio_input_ports.contains_key(port_key) {
+      match self.get_ports_mut().audio_input_ports.get_mut(port_key) {
+        Some(port) => return Ok(port),
+        None => unreachable!(),
+      }
+    }
+    Err(Error::AudioInputPortNotFound(self.full_name(), port_key))
+  }
+
+  fn get_audio_output_port(&self, port_key: AudioOutputPortKey) -> Result<&AudioOutputPort> {
+    self
+      .get_ports()
+      .audio_output_ports
+      .get(port_key)
+      .ok_or_else(|| Error::AudioOutputPortNotFound(self.full_name(), port_key))
+  }
+
+  fn get_audio_output_port_mut(
+    &mut self,
+    port_key: AudioOutputPortKey,
+  ) -> Result<&mut AudioOutputPort> {
+    // See this for further info on why this needs to be that convoluted:
+    // https://github.com/rust-lang/rfcs/blob/master/text/2094-nll.md#problem-case-3-conditional-control-flow-across-functions
+    if self.get_ports().audio_output_ports.contains_key(port_key) {
+      match self.get_ports_mut().audio_output_ports.get_mut(port_key) {
+        Some(port) => return Ok(port),
+        None => unreachable!(),
+      }
+    }
+    Err(Error::AudioOutputPortNotFound(self.full_name(), port_key))
+  }
+}
+
+pub fn port_path<N: NodeLike, I: HasId>(node: &N, port: &I) -> String {
+  format!("{}::{}", node.full_name(), port.id())
 }
