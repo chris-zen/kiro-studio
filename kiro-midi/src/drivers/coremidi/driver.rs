@@ -18,7 +18,7 @@ use crate::filter::Filter;
 use crate::input_config::InputConfig;
 use crate::input_handler::InputHandler;
 use crate::input_info::InputInfo;
-use crate::protocol::decoder::DecoderProtocol2;
+use crate::protocol::codec::Decoder;
 use crate::source_match::SourceMatches;
 
 type InputName = String;
@@ -235,7 +235,7 @@ impl CoreMidiDriver {
     filters: Arc<ArcSwap<HashMap<SourceId, Filter>>>,
   ) -> Result<InputPortWithContext<SourceId>, CoreMidiError> {
     let default_filter = Filter::new();
-    let mut decoder = DecoderProtocol2::default();
+    let mut decoder = Decoder::default();
     self
       .client
       .input_port_with_protocol(
@@ -260,7 +260,7 @@ impl CoreMidiDriver {
     _name: &str,
     filters: &ArcSwap<HashMap<SourceId, Filter>>,
     default_filter: &Filter,
-    decoder: &mut DecoderProtocol2,
+    decoder: &mut Decoder,
     handler: &mut InputHandler,
     events: &EventList,
     source_id: SourceId,

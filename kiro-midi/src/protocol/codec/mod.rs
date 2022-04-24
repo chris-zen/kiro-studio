@@ -1,10 +1,14 @@
+mod channel_voice;
+mod system_common;
+mod utility;
+
 use thiserror::Error;
 
 use crate::filter::Filter;
-use crate::protocol::messages::channel_voice::ChannelVoice;
-use crate::protocol::messages::utility::Utility;
+use crate::protocol::codec::channel_voice::decode_channel_voice;
+use crate::protocol::codec::system_common::decode_system_common;
+use crate::protocol::codec::utility::decode_utility;
 use crate::protocol::messages::{Message, MessageType};
-use crate::protocol::Decode;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -13,13 +17,13 @@ pub enum Error {
 }
 
 #[derive(Default)]
-pub struct DecoderProtocol2 {
+pub struct Decoder {
   ump: [u32; 4],
   index: usize,
   len: usize,
 }
 
-impl DecoderProtocol2 {
+impl Decoder {
   pub fn next(&mut self, data: u32, filter: &Filter) -> Result<Option<Message>, Error> {
     if self.index == 0 {
       self.init(data);
@@ -72,19 +76,25 @@ impl DecoderProtocol2 {
 
   fn decode(&mut self, mtype: u8, group: u8, filter: &Filter) -> Option<Message> {
     match mtype {
-      0x00 => Some(Message {
+      // Utility
+      0x00 => decode_utility(&self.ump[0..1]).map(|utility| Message {
         group,
-        mtype: MessageType::Utility(Utility::decode(&self.ump[0..1])),
+        mtype: MessageType::Utility(utility),
       }),
-      0x04 => {
-        let channel_voice = ChannelVoice::decode(&self.ump[0..2]);
+      // System Common and Real Time
+      0x01 => decode_system_common(&self.ump[0..1]).map(|system_common| Message {
+        group,
+        mtype: MessageType::SystemCommon(system_common),
+      }),
+      // Channel Voice
+      0x04 => decode_channel_voice(&self.ump[0..2]).and_then(|channel_voice| {
         filter
           .channel(group, channel_voice.channel)
           .then(|| Message {
             group,
             mtype: MessageType::ChannelVoice(channel_voice),
           })
-      }
+      }),
       _ => None,
     }
   }
@@ -98,13 +108,14 @@ impl DecoderProtocol2 {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::protocol::decoder::DecoderProtocol2;
-  use crate::protocol::messages::channel_voice::ChanelVoiceMessage;
+  use crate::messages::channel_voice::ChannelVoice;
+  use crate::protocol::codec::Decoder;
+  use crate::protocol::messages::channel_voice::ChannelVoiceMessage;
 
   #[test]
   fn first_word_does_not_emit() {
     let filter = Filter::new();
-    let mut decoder = DecoderProtocol2::default();
+    let mut decoder = Decoder::default();
 
     let result = decoder.next(0x40903c00, &filter);
 
@@ -118,7 +129,7 @@ mod tests {
   #[test]
   fn last_word_emits() {
     let filter = Filter::new();
-    let mut decoder = DecoderProtocol2::default();
+    let mut decoder = Decoder::default();
 
     decoder.next(0x41923c00, &filter);
     let result = decoder.next(0xabcd0000, &filter);
@@ -127,7 +138,7 @@ mod tests {
         group: 1,
         mtype: MessageType::ChannelVoice(ChannelVoice {
           channel: 2,
-          message: ChanelVoiceMessage::NoteOn {
+          message: ChannelVoiceMessage::NoteOn {
             note: 0x3c,
             velocity: 0xabcd,
             attr_type: 0,
@@ -143,7 +154,7 @@ mod tests {
   #[test]
   fn two_messages_are_emitted() {
     let filter = Filter::new();
-    let mut decoder = DecoderProtocol2::default();
+    let mut decoder = Decoder::default();
 
     decoder.next(0x41923c00, &filter);
     let result = decoder.next(0xabcd0000, &filter);
@@ -159,7 +170,7 @@ mod tests {
         group: 3,
         mtype: MessageType::ChannelVoice(ChannelVoice {
           channel: 5,
-          message: ChanelVoiceMessage::NoteOff {
+          message: ChannelVoiceMessage::NoteOff {
             note: 0x3d,
             velocity: 0x1234,
             attr_type: 0,
@@ -170,5 +181,63 @@ mod tests {
       "Unexpected result: {:?}",
       result
     );
+  }
+
+  #[test]
+  fn decode_utility() {
+    let filter = Filter::new();
+    let mut decoder = Decoder::default();
+
+    let result = decoder.next(0x00000000, &filter);
+    assert!(
+      matches!(
+        result,
+        Ok(Some(Message {
+          group: _,
+          mtype: MessageType::Utility(_)
+        }))
+      ),
+      "Unexpected result: {:?}",
+      result
+    )
+  }
+
+  #[test]
+  fn decode_system_common() {
+    let filter = Filter::new();
+    let mut decoder = Decoder::default();
+
+    let result = decoder.next(0x10f20000, &filter);
+    assert!(
+      matches!(
+        result,
+        Ok(Some(Message {
+          group: _,
+          mtype: MessageType::SystemCommon(_)
+        }))
+      ),
+      "Unexpected result: {:?}",
+      result
+    )
+  }
+
+  #[test]
+  fn decode_channel_voice() {
+    let filter = Filter::new();
+    let mut decoder = Decoder::default();
+
+    decoder.next(0x43853d00, &filter);
+    let result = decoder.next(0x00000000, &filter);
+    assert!(
+      matches!(
+        result,
+        Ok(Some(Message {
+          group: _,
+          mtype: MessageType::ChannelVoice(_)
+        }))
+      ),
+      "Unexpected result: {:?}",
+      result
+    )
   }
 }

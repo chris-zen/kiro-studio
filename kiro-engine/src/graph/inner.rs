@@ -8,7 +8,10 @@ use crate::graph::connection::{
 use crate::graph::error::{Error, Result};
 use crate::graph::module::{Module, ModuleDescriptor, ModuleKey};
 use crate::graph::node::{Node, NodeDescriptor, NodeKey};
-use crate::graph::port::{AudioDescriptor, AudioOutputPort, AudioOutputPortKey, DynamicPorts, EventsDescriptor, InputPortKey, InputSource, NodeLike, OutputPort, OutputPortKey, OutputSource, port_path, PortType};
+use crate::graph::port::{
+  port_path, AudioDescriptor, AudioOutputPort, AudioOutputPortKey, DynamicPorts, EventsDescriptor,
+  InputPortKey, InputSource, NodeLike, OutputPort, OutputPortKey, OutputSource, PortType,
+};
 use crate::graph::port::{InputPort, PortDescriptor};
 use crate::key_store::{HasId, KeyStore};
 
