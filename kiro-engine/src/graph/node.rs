@@ -9,7 +9,7 @@ pub type NodeKey = Key<Node>;
 pub struct Node {
   pub name: String,
   pub descriptor: NodeDescriptor,
-  pub module: ModuleKey,
+  pub parent: ModuleKey,
   pub path: String,
   pub ports: Ports,
 }
@@ -31,7 +31,7 @@ impl Node {
     Self {
       name: name.into(),
       descriptor,
-      module,
+      parent: module,
       path,
       ports,
     }

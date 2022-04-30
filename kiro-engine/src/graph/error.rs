@@ -31,4 +31,7 @@ pub enum Error {
 
   #[error("Binding between {0} and {1} is out of scope. They require a parent-child relationship")]
   BindingOutOfScope(String, String),
+
+  #[error("Connection between {0} and {1} is out of scope. They require a sibling relationship")]
+  ConnectionOutOfScope(String, String),
 }
