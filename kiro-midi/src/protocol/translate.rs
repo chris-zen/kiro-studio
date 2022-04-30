@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 use thiserror::Error;
 
-use crate::messages::system_exclusive::Payload;
 use crate::Filter;
 
 const NULL_STATUS: u8 = 0;
@@ -16,9 +15,6 @@ pub enum Error {
 
   #[error("UMP buffer overflow")]
   UmpOverflow,
-
-  #[error("Sysex internal overflow")]
-  SysexOverflow,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -199,7 +195,7 @@ impl Translator {
 
   fn handle_status(&mut self, status: u8, filter: &Filter) -> Result<(), Error> {
     if self.status == SYSEX_START_STATUS {
-      self.handle_sysex(true);
+      self.handle_sysex(true)?;
     }
     self.status = if status == SYSEX_END_STATUS {
       NULL_STATUS
@@ -438,7 +434,7 @@ impl Translator {
 
   #[inline]
   fn is_real_time(status: u8) -> bool {
-    status >= 0xf8 && status <= 0xff
+    status >= 0xf8
   }
 
   #[inline]
@@ -594,7 +590,7 @@ mod tests {
 
   #[test]
   fn system_real_time_interleave() {
-    let translator = assert_decodes(
+    assert_decodes(
       vec![0x89, 0x40, 0xfa, 0x7f, 0xfb, 0x41, 0xfc, 0x40],
       vec![
         0x10fa0000, 0x40894000, 0xffff0000, 0x10fb0000, 0x10fc0000, 0x40894100, 0x80000000,

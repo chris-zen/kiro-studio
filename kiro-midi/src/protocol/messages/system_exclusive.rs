@@ -84,8 +84,7 @@ impl<const N: usize> TryFrom<&[u8]> for Payload<N> {
   type Error = ();
   fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
     if data.len() <= N {
-      let mut payload = Payload::new(data)?;
-      Ok(payload)
+      Payload::new(data)
     } else {
       Err(())
     }

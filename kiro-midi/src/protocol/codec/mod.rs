@@ -132,7 +132,7 @@ mod tests {
     let filter = Filter::new();
     let mut decoder = Decoder::default();
 
-    decoder.next(0x41923c00, &filter);
+    assert!(matches!(decoder.next(0x41923c00, &filter), Ok(_)));
     let result = decoder.next(0xabcd0000, &filter);
     assert!(
       matches!(&result, Ok(Some(message)) if message == &Message {
@@ -157,14 +157,14 @@ mod tests {
     let filter = Filter::new();
     let mut decoder = Decoder::default();
 
-    decoder.next(0x41923c00, &filter);
+    assert!(matches!(decoder.next(0x41923c00, &filter), Ok(_)));
     let result = decoder.next(0xabcd0000, &filter);
     assert!(
       matches!(&result, Ok(Some(_))),
       "Unexpected result: {:?}",
       result
     );
-    decoder.next(0x43853d00, &filter);
+    assert!(matches!(decoder.next(0x43853d00, &filter), Ok(_)));
     let result = decoder.next(0x12340000, &filter);
     assert!(
       matches!(&result, Ok(Some(message)) if message == &Message {
@@ -227,7 +227,7 @@ mod tests {
     let filter = Filter::new();
     let mut decoder = Decoder::default();
 
-    decoder.next(0x43853d00, &filter);
+    assert!(matches!(decoder.next(0x43853d00, &filter), Ok(_)));
     let result = decoder.next(0x00000000, &filter);
     assert!(
       matches!(

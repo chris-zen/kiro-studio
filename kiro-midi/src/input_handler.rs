@@ -77,7 +77,7 @@ mod tests {
 
   #[test]
   fn from_ring_buffer() {
-    let (mut producer, mut consumer) = ringbuf::RingBuffer::new(1).split();
+    let (producer, mut consumer) = ringbuf::RingBuffer::new(1).split();
     let event = Event {
       timestamp: 0,
       endpoint: 0,
