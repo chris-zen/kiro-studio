@@ -1,9 +1,13 @@
 use std::collections::VecDeque;
 use thiserror::Error;
 
+use crate::messages::system_exclusive::Payload;
 use crate::Filter;
 
 const NULL_STATUS: u8 = 0;
+const SYSEX_START_STATUS: u8 = 0xf0;
+const SYSEX_END_STATUS: u8 = 0xf7;
+const SYSEX_MAX_LEN: usize = 6;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -12,6 +16,9 @@ pub enum Error {
 
   #[error("UMP buffer overflow")]
   UmpOverflow,
+
+  #[error("Sysex internal overflow")]
+  SysexOverflow,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -129,6 +136,12 @@ impl ControllerState {
   }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum SysexStatus {
+  Start,
+  Continue,
+}
+
 pub struct Translator {
   group: u8,
   status: u8,
@@ -137,6 +150,7 @@ pub struct Translator {
   ump: VecDeque<u32>,
   banks: [Data14; 16],
   controllers: [ControllerState; 16],
+  sysex: SysexStatus,
 }
 
 impl Translator {
@@ -152,6 +166,7 @@ impl Translator {
       ump: VecDeque::with_capacity(Self::UMP_CAPACITY),
       banks: [Data14::default(); 16],
       controllers: [ControllerState::new(); 16],
+      sysex: SysexStatus::Start,
     }
   }
 
@@ -183,13 +198,21 @@ impl Translator {
   }
 
   fn handle_status(&mut self, status: u8, filter: &Filter) -> Result<(), Error> {
-    self.status = status;
+    if self.status == SYSEX_START_STATUS {
+      self.handle_sysex(true);
+    }
+    self.status = if status == SYSEX_END_STATUS {
+      NULL_STATUS
+    } else {
+      status
+    };
     self.data.clear();
     self.len = 0;
     match status {
       // System Exclusive
-      0xf0 => {
-        todo!()
+      SYSEX_START_STATUS => {
+        self.sysex = SysexStatus::Start;
+        Ok(())
       }
       // Reserved
       0xf4 | 0xf5 => {
@@ -198,10 +221,7 @@ impl Translator {
       }
       // Tune Request
       0xf6 => self.emit_system_common(self.status, 0x00, 0x00),
-      // End Of System Exclusive
-      0xf7 => {
-        todo!()
-      }
+      SYSEX_END_STATUS => Ok(()),
       _ => {
         self.len = Self::expected_len(status);
         // Wait for the next data bytes
@@ -215,6 +235,13 @@ impl Translator {
     if self.status == NULL_STATUS {
       // Skip data byte
       Ok(())
+    } else if self.status == SYSEX_START_STATUS {
+      self.data.push(data);
+      if self.data.len() == SYSEX_MAX_LEN {
+        self.handle_sysex(false)
+      } else {
+        Ok(())
+      }
     } else if self.data.len() < Self::DATA_CAPACITY {
       self.data.push(data);
       if self.data.len() == self.len {
@@ -226,6 +253,39 @@ impl Translator {
     } else {
       Err(Error::DataOverflow)
     }
+  }
+
+  fn handle_sysex(&mut self, end_of_sysex: bool) -> Result<(), Error> {
+    let data_at =
+      |index: usize, shift: usize| self.data.get(index).map_or(0u32, |b| *b as u32) << shift;
+
+    let mut ump = [
+      Self::ump_type_and_group(0x3, self.group)
+        | Self::ump_byte(self.data.len() as u8, 16)
+        | data_at(0, 8)
+        | data_at(1, 0),
+      data_at(2, 24) | data_at(3, 16) | data_at(4, 8) | data_at(5, 0),
+    ];
+
+    match self.sysex {
+      SysexStatus::Start => {
+        if !end_of_sysex {
+          ump[0] |= 0x1 << 20;
+        }
+      }
+      SysexStatus::Continue => {
+        if !end_of_sysex {
+          ump[0] |= 0x2 << 20;
+        } else {
+          ump[0] |= 0x3 << 20;
+        }
+      }
+    }
+
+    let result = self.emit(&ump);
+    self.data.clear();
+    self.sysex = SysexStatus::Continue;
+    result
   }
 
   fn handle_message(&mut self, filter: &Filter) -> Result<(), Error> {
@@ -386,7 +446,7 @@ impl Translator {
     match status & 0xf0 {
       0xc0 | 0xd0 => 1,
       0xf0 => match status {
-        // TODO 0xf0 should be 16
+        0xf0 | 0xf7 => 0,
         0xf1 | 0xf3 => 1,
         0xf2 => 2,
         _ => unreachable!(),
@@ -403,6 +463,20 @@ impl Translator {
       .for_each(|controller| controller.reset());
   }
 
+  fn emit_system_common(&mut self, status: u8, data0: u8, data1: u8) -> Result<(), Error> {
+    self.emit(&[Self::ump_type_and_group(0x1, self.group)
+      | Self::ump_byte(status, 16)
+      | Self::ump_byte(data0, 8)
+      | Self::ump_byte(data1, 0)])
+  }
+
+  fn emit_channel_voice(&mut self, status: u8, index: u16, data: u32) -> Result<(), Error> {
+    self.emit(&[
+      Self::ump_type_and_group(0x4, self.group) | Self::ump_byte(status, 16) | (index as u32),
+      data,
+    ])
+  }
+
   fn emit(&mut self, ump: &[u32]) -> Result<(), Error> {
     if self.ump.len() + ump.len() <= Self::UMP_CAPACITY {
       self.ump.extend(ump.iter());
@@ -412,18 +486,16 @@ impl Translator {
     }
   }
 
-  fn emit_channel_voice(&mut self, status: u8, index: u16, data: u32) -> Result<(), Error> {
-    self.emit(&[
-      ((0x40 | self.group as u32) << 24) | ((status as u32) << 16) | (index as u32),
-      data,
-    ])
+  #[inline]
+  fn ump_type_and_group(mtype: u8, group: u8) -> u32 {
+    assert!(mtype <= 0x7f);
+    assert!(group <= 0x7f);
+    Self::ump_byte((mtype << 4) | group, 24)
   }
 
-  fn emit_system_common(&mut self, status: u8, data0: u8, data1: u8) -> Result<(), Error> {
-    self.emit(&[((0x10 | self.group as u32) << 24)
-      | ((status as u32) << 16)
-      | ((data0 as u32) << 8)
-      | (data1 as u32)])
+  #[inline]
+  fn ump_byte(value: u8, shift: u8) -> u32 {
+    (value as u32) << shift
   }
 }
 
@@ -526,6 +598,50 @@ mod tests {
       vec![0x89, 0x40, 0xfa, 0x7f, 0xfb, 0x41, 0xfc, 0x40],
       vec![
         0x10fa0000, 0x40894000, 0xffff0000, 0x10fb0000, 0x10fc0000, 0x40894100, 0x80000000,
+      ],
+    );
+  }
+
+  #[test]
+  fn system_exclusive_complete() {
+    assert_decodes(
+      vec![0xf0, 0x01, 0x02, 0x03, 0x04, 0xf7],
+      vec![0x30040102, 0x03040000],
+    );
+  }
+
+  #[test]
+  fn system_exclusive_start_end() {
+    assert_decodes(
+      vec![0xf0, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0xf7],
+      vec![0x30160102, 0x03040506, 0x30300000, 0x00000000],
+    );
+
+    assert_decodes(
+      vec![
+        0xf0, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0xf7,
+      ],
+      vec![0x30160102, 0x03040506, 0x30330708, 0x09000000],
+    );
+  }
+
+  #[test]
+  fn system_exclusive_start_continue_end() {
+    assert_decodes(
+      vec![
+        0xf0, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0xf7,
+      ],
+      vec![
+        0x30160102, 0x03040506, 0x30260708, 0x090a0b0c, 0x30300000, 0x00000000,
+      ],
+    );
+
+    assert_decodes(
+      vec![
+        0xf0, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0xf7,
+      ],
+      vec![
+        0x30160102, 0x03040506, 0x30260708, 0x090a0b0c, 0x30310d00, 0x00000000,
       ],
     );
   }

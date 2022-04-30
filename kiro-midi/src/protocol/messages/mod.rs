@@ -1,9 +1,11 @@
 pub mod channel_voice;
 pub mod system_common;
+pub mod system_exclusive;
 pub mod utility;
 
 use crate::messages::channel_voice::ChannelVoiceMessage;
 use crate::messages::system_common::SystemCommon;
+use crate::messages::system_exclusive::SystemExclusive;
 use crate::protocol::messages::channel_voice::ChannelVoice;
 use crate::protocol::messages::utility::Utility;
 
@@ -30,7 +32,7 @@ impl Message {
 pub enum MessageType {
   Utility(Utility),
   SystemCommon(SystemCommon),
-  // SystemExclusive(SystemExclusive),
+  SystemExclusive(SystemExclusive),
   ChannelVoice(ChannelVoice),
   // Data(Data)
 }
