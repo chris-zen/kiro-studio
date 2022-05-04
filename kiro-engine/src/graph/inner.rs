@@ -625,7 +625,248 @@ impl InnerGraph {
   }
 
   pub fn connect_events(&mut self, connection: EventsConnection) -> Result<()> {
-    todo!()
+    match connection {
+      EventsConnection::ModuleOutBindModuleOut(mut src_module_out, mut dst_module_out) => {
+        self.connect_events_module_out_bind_module_out(src_module_out, dst_module_out)
+      }
+      EventsConnection::NodeOutBindModuleOut(src_node_out, dst_module_out) => {
+        self.connect_events_node_out_bind_module_out(src_node_out, dst_module_out)
+      }
+      EventsConnection::ModuleInBindModuleIn(src_module_in, dst_module_in) => {
+        self.connect_events_module_in_bind_module_in(src_module_in, dst_module_in)
+      }
+      EventsConnection::ModuleInBindNodeIn(src_module_in, dst_node_in) => {
+        self.connect_events_module_in_bind_node_in(src_module_in, dst_node_in)
+      }
+      EventsConnection::ModuleOutToNodeIn(src_module_out, dst_node_in) => {
+        self.connect_events_module_out_to_node_in(src_module_out, dst_node_in)
+      }
+      EventsConnection::ModuleOutToModuleIn(src_module_out, dst_module_in) => {
+        self.connect_events_module_out_to_module_in(src_module_out, dst_module_in)
+      }
+      EventsConnection::NodeOutToNodeIn(src_node_out, dst_node_in) => {
+        self.connect_events_node_out_to_node_in(src_node_out, dst_node_in)
+      }
+      EventsConnection::NodeOutToModuleIn(src_node_out, dst_module_in) => {
+        self.connect_events_node_out_to_module_in(src_node_out, dst_module_in)
+      }
+    }
+  }
+
+  fn connect_events_module_out_bind_module_out(
+    &mut self,
+    mut src_module_out: ModuleOut<EventsDescriptor>,
+    mut dst_module_out: ModuleOut<EventsDescriptor>,
+  ) -> Result<()> {
+    let mut src_module = self.get_module(src_module_out.module_key())?;
+    let mut src_port = src_module.get_events_output_port(src_module_out.output_port_key())?;
+
+    let mut dst_module = self.get_module(dst_module_out.module_key())?;
+    let mut dst_port = dst_module.get_events_output_port(dst_module_out.output_port_key())?;
+
+    if src_module.parent != Some(dst_module_out.module_key()) {
+      if dst_module.parent == Some(src_module_out.module_key()) {
+        self.connect_events_module_out_bind_module_out(dst_module_out, src_module_out)
+      } else {
+        let src_path = port_path(src_module, src_port);
+        let dst_path = port_path(dst_module, dst_port);
+        Err(Error::BindingOutOfScope(src_path, dst_path))?
+      }
+    } else if dst_port.source.is_some() {
+      let dst_path = port_path(dst_module, dst_port);
+      Err(Error::EventsOutputSourceAlreadyDefined(dst_path))
+    } else {
+      let dst_module = self.get_module_mut(dst_module_out.module_key())?;
+      let dst_port = dst_module.get_events_output_port_mut(dst_module_out.output_port_key())?;
+      dst_port.source = Some(OutputSource::ModuleBinding(src_module_out));
+      Ok(())
+    }
+  }
+
+  fn connect_events_node_out_bind_module_out(
+    &mut self,
+    src_node_out: NodeOut<EventsDescriptor>,
+    dst_module_out: ModuleOut<EventsDescriptor>,
+  ) -> Result<()> {
+    let mut src_node = self.get_node(src_node_out.node_key())?;
+    let mut src_port = src_node.get_events_output_port(src_node_out.output_port_key())?;
+
+    let mut dst_module = self.get_module(dst_module_out.module_key())?;
+    let mut dst_port = dst_module.get_events_output_port(dst_module_out.output_port_key())?;
+
+    if src_node.parent != dst_module_out.module_key() {
+      let src_path = port_path(src_node, src_port);
+      let dst_path = port_path(dst_module, dst_port);
+      Err(Error::BindingOutOfScope(src_path, dst_path))
+    } else if dst_port.source.is_some() {
+      let dst_path = port_path(dst_module, dst_port);
+      Err(Error::EventsOutputSourceAlreadyDefined(dst_path))
+    } else {
+      let dst_module = self.get_module_mut(dst_module_out.module_key())?;
+      let dst_port = dst_module.get_events_output_port_mut(dst_module_out.output_port_key())?;
+      dst_port.source = Some(OutputSource::NodeBinding(src_node_out));
+      Ok(())
+    }
+  }
+
+  fn connect_events_module_in_bind_module_in(
+    &mut self,
+    src_module_in: ModuleIn<EventsDescriptor>,
+    dst_module_in: ModuleIn<EventsDescriptor>,
+  ) -> Result<()> {
+    let mut src_module = self.get_module(src_module_in.module_key())?;
+    let mut src_port = src_module.get_events_input_port(src_module_in.input_port_key())?;
+
+    let mut dst_module = self.get_module(dst_module_in.module_key())?;
+    let mut dst_port = dst_module.get_events_input_port(dst_module_in.input_port_key())?;
+
+    if dst_module.parent != Some(src_module_in.module_key()) {
+      if src_module.parent == Some(dst_module_in.module_key()) {
+        self.connect_events_module_in_bind_module_in(dst_module_in, src_module_in)
+      } else {
+        let src_path = port_path(src_module, src_port);
+        let dst_path = port_path(dst_module, dst_port);
+        Err(Error::BindingOutOfScope(src_path, dst_path))
+      }
+    } else if dst_port.source.is_some() {
+      let dst_path = port_path(dst_module, dst_port);
+      Err(Error::EventsInputSourceAlreadyDefined(dst_path))
+    } else {
+      let dst_module = self.get_module_mut(dst_module_in.module_key())?;
+      let dst_port = dst_module.get_events_input_port_mut(dst_module_in.input_port_key())?;
+      dst_port.source = Some(InputSource::ModuleBinding(src_module_in));
+      Ok(())
+    }
+  }
+
+  fn connect_events_module_in_bind_node_in(
+    &mut self,
+    src_module_in: ModuleIn<EventsDescriptor>,
+    dst_node_in: NodeIn<EventsDescriptor>,
+  ) -> Result<()> {
+    let mut src_module = self.get_module(src_module_in.module_key())?;
+    let mut src_port = src_module.get_events_input_port(src_module_in.input_port_key())?;
+
+    let mut dst_node = self.get_node(dst_node_in.node_key())?;
+    let mut dst_port = dst_node.get_events_input_port(dst_node_in.input_port_key())?;
+
+    if dst_node.parent != src_module_in.module_key() {
+      let src_path = port_path(src_module, src_port);
+      let dst_path = port_path(dst_node, dst_port);
+      Err(Error::BindingOutOfScope(src_path, dst_path))
+    } else if dst_port.source.is_some() {
+      let dst_path = port_path(dst_node, dst_port);
+      Err(Error::EventsInputSourceAlreadyDefined(dst_path))
+    } else {
+      let dst_node = self.get_node_mut(dst_node_in.node_key())?;
+      let dst_port = dst_node.get_events_input_port_mut(dst_node_in.input_port_key())?;
+      dst_port.source = Some(InputSource::ModuleBinding(src_module_in));
+      Ok(())
+    }
+  }
+
+  fn connect_events_module_out_to_node_in(
+    &mut self,
+    src_module_out: ModuleOut<EventsDescriptor>,
+    dst_node_in: NodeIn<EventsDescriptor>,
+  ) -> Result<()> {
+    let mut src_module = self.get_module(src_module_out.module_key())?;
+    let mut src_port = src_module.get_events_output_port(src_module_out.output_port_key())?;
+
+    let mut dst_node = self.get_node(dst_node_in.node_key())?;
+    let mut dst_port = dst_node.get_events_input_port(dst_node_in.input_port_key())?;
+
+    if src_module.parent != Some(dst_node.parent) {
+      let src_path = port_path(src_module, src_port);
+      let dst_path = port_path(dst_node, dst_port);
+      Err(Error::ConnectionOutOfScope(src_path, dst_path))
+    } else if dst_port.source.is_some() {
+      let dst_path = port_path(dst_node, dst_port);
+      Err(Error::EventsInputSourceAlreadyDefined(dst_path))
+    } else {
+      let dst_node = self.get_node_mut(dst_node_in.node_key())?;
+      let dst_port = dst_node.get_events_input_port_mut(dst_node_in.input_port_key())?;
+      dst_port.source = Some(InputSource::ModuleConnection(src_module_out));
+      Ok(())
+    }
+  }
+
+  fn connect_events_module_out_to_module_in(
+    &mut self,
+    src_module_out: ModuleOut<EventsDescriptor>,
+    dst_module_in: ModuleIn<EventsDescriptor>,
+  ) -> Result<()> {
+    let mut src_module = self.get_module(src_module_out.module_key())?;
+    let mut src_port = src_module.get_events_output_port(src_module_out.output_port_key())?;
+
+    let mut dst_module = self.get_module(dst_module_in.module_key())?;
+    let mut dst_port = dst_module.get_events_input_port(dst_module_in.input_port_key())?;
+
+    if src_module.parent != dst_module.parent {
+      let src_path = port_path(src_module, src_port);
+      let dst_path = port_path(dst_module, dst_port);
+      Err(Error::ConnectionOutOfScope(src_path, dst_path))
+    } else if dst_port.source.is_some() {
+      let dst_path = port_path(dst_module, dst_port);
+      Err(Error::EventsInputSourceAlreadyDefined(dst_path))
+    } else {
+      let mut dst_module = self.get_module_mut(dst_module_in.module_key())?;
+      let mut dst_port = dst_module.get_events_input_port_mut(dst_module_in.input_port_key())?;
+      dst_port.source = Some(InputSource::ModuleConnection(src_module_out));
+      Ok(())
+    }
+  }
+
+  fn connect_events_node_out_to_node_in(
+    &mut self,
+    src_node_out: NodeOut<EventsDescriptor>,
+    dst_node_in: NodeIn<EventsDescriptor>,
+  ) -> Result<()> {
+    let mut src_node = self.get_node(src_node_out.node_key())?;
+    let mut src_port = src_node.get_events_output_port(src_node_out.output_port_key())?;
+
+    let mut dst_node = self.get_node(dst_node_in.node_key())?;
+    let mut dst_port = dst_node.get_events_input_port(dst_node_in.input_port_key())?;
+
+    if src_node.parent != dst_node.parent {
+      let src_path = port_path(src_node, src_port);
+      let dst_path = port_path(dst_node, dst_port);
+      Err(Error::ConnectionOutOfScope(src_path, dst_path))
+    } else if dst_port.source.is_some() {
+      let dst_path = port_path(dst_node, dst_port);
+      Err(Error::EventsInputSourceAlreadyDefined(dst_path))
+    } else {
+      let dst_node = self.get_node_mut(dst_node_in.node_key())?;
+      let dst_port = dst_node.get_events_input_port_mut(dst_node_in.input_port_key())?;
+      dst_port.source = Some(InputSource::NodeConnection(src_node_out));
+      Ok(())
+    }
+  }
+
+  fn connect_events_node_out_to_module_in(
+    &mut self,
+    src_node_out: NodeOut<EventsDescriptor>,
+    dst_module_in: ModuleIn<EventsDescriptor>,
+  ) -> Result<()> {
+    let mut src_node = self.get_node(src_node_out.node_key())?;
+    let mut src_port = src_node.get_events_output_port(src_node_out.output_port_key())?;
+
+    let mut dst_module = self.get_module(dst_module_in.module_key())?;
+    let mut dst_port = dst_module.get_events_input_port(dst_module_in.input_port_key())?;
+
+    if Some(src_node.parent) != dst_module.parent {
+      let src_path = port_path(src_node, src_port);
+      let dst_path = port_path(dst_module, dst_port);
+      Err(Error::ConnectionOutOfScope(src_path, dst_path))
+    } else if dst_port.source.is_some() {
+      let dst_path = port_path(dst_module, dst_port);
+      Err(Error::EventsInputSourceAlreadyDefined(dst_path))
+    } else {
+      let mut dst_module = self.get_module_mut(dst_module_in.module_key())?;
+      let mut dst_port = dst_module.get_events_input_port_mut(dst_module_in.input_port_key())?;
+      dst_port.source = Some(InputSource::NodeConnection(src_node_out));
+      Ok(())
+    }
   }
 
   pub(crate) fn get_module(&self, key: ModuleKey) -> Result<&Module> {
@@ -769,7 +1010,7 @@ mod tests {
     g.connect_audio(n2_audio_out[0].bind(m2_audio_out[0]))
       .unwrap();
 
-    g.connect_audio(m2_audio_out[0].bind(m2_audio_out[0]))
+    g.connect_audio(m2_audio_out[0].bind(m1_audio_out[0]))
       .unwrap();
   }
 }

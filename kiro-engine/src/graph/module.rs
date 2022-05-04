@@ -47,7 +47,7 @@ impl Module {
 
 impl NodeLike for Module {
   fn full_name(&self) -> String {
-    format!("{}::{}", self.path, self.name)
+    format!("{}/{}", self.path, self.name)
   }
 
   fn get_audio_descriptor_ports(&self) -> &DescriptorPorts<AudioDescriptor> {

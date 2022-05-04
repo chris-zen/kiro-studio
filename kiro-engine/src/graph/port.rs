@@ -323,8 +323,54 @@ pub trait NodeLike {
     }
     Err(Error::AudioOutputPortNotFound(self.full_name(), port_key))
   }
+
+  fn get_events_input_port(&self, port_key: EventsInputPortKey) -> Result<&EventsInputPort> {
+    self
+      .get_ports()
+      .events_input_ports
+      .get(port_key)
+      .ok_or_else(|| Error::EventsInputPortNotFound(self.full_name(), port_key))
+  }
+
+  fn get_events_input_port_mut(
+    &mut self,
+    port_key: EventsInputPortKey,
+  ) -> Result<&mut EventsInputPort> {
+    // See this for further info on why this needs to be that convoluted:
+    // https://github.com/rust-lang/rfcs/blob/master/text/2094-nll.md#problem-case-3-conditional-control-flow-across-functions
+    if self.get_ports().events_input_ports.contains_key(port_key) {
+      match self.get_ports_mut().events_input_ports.get_mut(port_key) {
+        Some(port) => return Ok(port),
+        None => unreachable!(),
+      }
+    }
+    Err(Error::EventsInputPortNotFound(self.full_name(), port_key))
+  }
+
+  fn get_events_output_port(&self, port_key: EventsOutputPortKey) -> Result<&EventsOutputPort> {
+    self
+      .get_ports()
+      .events_output_ports
+      .get(port_key)
+      .ok_or_else(|| Error::EventsOutputPortNotFound(self.full_name(), port_key))
+  }
+
+  fn get_events_output_port_mut(
+    &mut self,
+    port_key: EventsOutputPortKey,
+  ) -> Result<&mut EventsOutputPort> {
+    // See this for further info on why this needs to be that convoluted:
+    // https://github.com/rust-lang/rfcs/blob/master/text/2094-nll.md#problem-case-3-conditional-control-flow-across-functions
+    if self.get_ports().events_output_ports.contains_key(port_key) {
+      match self.get_ports_mut().events_output_ports.get_mut(port_key) {
+        Some(port) => return Ok(port),
+        None => unreachable!(),
+      }
+    }
+    Err(Error::EventsOutputPortNotFound(self.full_name(), port_key))
+  }
 }
 
 pub fn port_path<N: NodeLike, I: HasId>(node: &N, port: &I) -> String {
-  format!("{}::{}", node.full_name(), port.id())
+  format!("{}:{}", node.full_name(), port.id())
 }
