@@ -1,17 +1,12 @@
-mod connection;
-mod error;
-mod inner;
-mod module;
-mod node;
-mod param;
-mod port;
+pub mod connection;
+pub mod error;
+pub mod inner;
+pub mod module;
+pub mod node;
+pub mod param;
+pub mod port;
 
-use std::cell::RefCell;
-use std::rc::Rc;
-use thiserror::Error;
-
-use crate::graph::inner::InnerGraph;
-use crate::graph::port::NodeLike;
-use crate::graph::port::PortDescriptor;
-
-pub struct Graph(Rc<RefCell<InnerGraph>>);
+pub use error::Error;
+pub use inner::InnerGraph;
+pub use module::{ModuleDescriptor, ModuleKey};
+pub use node::{NodeDescriptor, NodeKey};

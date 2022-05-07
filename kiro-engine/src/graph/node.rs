@@ -1,11 +1,13 @@
 use crate::graph::module::ModuleKey;
 use crate::graph::param::ParamDescriptor;
-use crate::graph::port::{AudioDescriptor, DescriptorPorts, EventsDescriptor, NodeLike, Ports};
+use crate::graph::port::{
+  AudioDescriptor, DescriptorPorts, EventsDescriptor, GenericDescriptorPorts, NodeLike, Ports,
+};
 use crate::key_gen::Key;
 
 pub type NodeKey = Key<Node>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Node {
   pub name: String,
   pub descriptor: NodeDescriptor,
@@ -22,10 +24,10 @@ impl Node {
     path: String,
   ) -> Self {
     let ports = Ports::new(
-      descriptor.audio_ports.static_inputs.as_slice(),
-      descriptor.audio_ports.static_outputs.as_slice(),
-      descriptor.events_ports.static_inputs.as_slice(),
-      descriptor.events_ports.static_outputs.as_slice(),
+      descriptor.ports.audio.static_inputs.as_slice(),
+      descriptor.ports.audio.static_outputs.as_slice(),
+      descriptor.ports.events.static_inputs.as_slice(),
+      descriptor.ports.events.static_outputs.as_slice(),
     );
 
     Self {
@@ -43,12 +45,8 @@ impl NodeLike for Node {
     format!("{}/{}", self.path, self.name)
   }
 
-  fn get_audio_descriptor_ports(&self) -> &DescriptorPorts<AudioDescriptor> {
-    &self.descriptor.audio_ports
-  }
-
-  fn get_events_descriptor_ports(&self) -> &DescriptorPorts<EventsDescriptor> {
-    &self.descriptor.events_ports
+  fn get_descriptor_ports(&self) -> &DescriptorPorts {
+    &self.descriptor.ports
   }
 
   fn get_ports(&self) -> &Ports {
@@ -62,24 +60,16 @@ impl NodeLike for Node {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct NodeDescriptor {
-  pub class: String,
   pub parameters: Vec<ParamDescriptor>,
-  pub audio_ports: DescriptorPorts<AudioDescriptor>,
-  pub events_ports: DescriptorPorts<EventsDescriptor>,
+  pub ports: DescriptorPorts,
 }
 
 impl NodeDescriptor {
-  pub fn new<S: Into<String>>(class: S) -> Self {
+  pub fn new() -> Self {
     Self {
-      class: class.into(),
       parameters: Vec::new(),
-      audio_ports: DescriptorPorts::new(),
-      events_ports: DescriptorPorts::new(),
+      ports: DescriptorPorts::new(),
     }
-  }
-
-  pub fn class(&self) -> &str {
-    self.class.as_str()
   }
 
   pub fn parameters(mut self, params: Vec<ParamDescriptor>) -> Self {
@@ -89,17 +79,17 @@ impl NodeDescriptor {
 
   pub fn with_audio_ports<F>(mut self, f: F) -> Self
   where
-    F: FnOnce(DescriptorPorts<AudioDescriptor>) -> DescriptorPorts<AudioDescriptor>,
+    F: FnOnce(GenericDescriptorPorts<AudioDescriptor>) -> GenericDescriptorPorts<AudioDescriptor>,
   {
-    self.audio_ports = f(self.audio_ports);
+    self.ports.audio = f(self.ports.audio);
     self
   }
 
   pub fn with_events_ports<F>(mut self, f: F) -> Self
   where
-    F: FnOnce(DescriptorPorts<EventsDescriptor>) -> DescriptorPorts<EventsDescriptor>,
+    F: FnOnce(GenericDescriptorPorts<EventsDescriptor>) -> GenericDescriptorPorts<EventsDescriptor>,
   {
-    self.events_ports = f(self.events_ports);
+    self.ports.events = f(self.ports.events);
     self
   }
 }

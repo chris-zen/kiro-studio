@@ -12,7 +12,7 @@ pub struct Studio {
   config: Config,
   _midi_driver: Driver,
   _audio_driver: audio::AudioDriver,
-  controller: Controller,
+  engine: Engine,
 }
 
 impl Studio {
@@ -32,8 +32,9 @@ impl Studio {
     let mut engine_config = EngineConfig::default();
     engine_config.audio_buffer_size = audio_config.buffer_size;
 
-    let engine = Engine::with_config(engine_config);
-    let (controller, renderer) = engine.split();
+    let mut engine = Engine::with_config(engine_config);
+    // the renderer will always be available just after creating the engine so it is safe to unwrap
+    let renderer = engine.take_renderer().unwrap();
 
     let studio_callack = StudioCallback {
       midi_consumer: midi_track_consumer,
@@ -46,7 +47,7 @@ impl Studio {
       config,
       _midi_driver: midi_driver,
       _audio_driver: audio_driver,
-      controller,
+      engine,
     })
   }
 }
