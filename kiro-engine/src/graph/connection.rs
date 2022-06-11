@@ -28,7 +28,7 @@ pub type ModuleEventsOut = ModuleOut<EventsDescriptor>;
 pub type NodeEventsIn = NodeIn<EventsDescriptor>;
 pub type NodeEventsOut = NodeOut<EventsDescriptor>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModuleIn<D>(pub ModuleKey, pub InputPortKey<D>);
 
 impl<D> Copy for ModuleIn<D> where D: PortDescriptor {}
@@ -100,7 +100,7 @@ impl<D> From<NodeOut<D>> for ModuleInFrom<D> {
   }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModuleOut<D>(pub ModuleKey, pub OutputPortKey<D>);
 
 impl<D> Copy for ModuleOut<D> where D: PortDescriptor {}
@@ -178,7 +178,7 @@ impl<D> From<NodeOut<D>> for ModuleOutBindFrom<D> {
   }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NodeIn<D>(pub NodeKey, pub InputPortKey<D>);
 
 impl<D> Copy for NodeIn<D> where D: PortDescriptor {}
@@ -227,7 +227,7 @@ impl<D> From<NodeOut<D>> for NodeInFrom<D> {
   }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NodeOut<D>(pub NodeKey, pub OutputPortKey<D>);
 
 impl<D> Copy for NodeOut<D> where D: PortDescriptor {}

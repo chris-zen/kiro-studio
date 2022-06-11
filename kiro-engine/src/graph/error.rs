@@ -2,9 +2,6 @@ use thiserror::Error;
 
 use crate::graph::module::ModuleKey;
 use crate::graph::node::NodeKey;
-use crate::graph::port::{
-  AudioInputPortKey, AudioOutputPortKey, EventsInputPortKey, EventsOutputPortKey,
-};
 
 pub type Result<T> = core::result::Result<T, Error>;
 

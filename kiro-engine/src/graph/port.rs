@@ -12,11 +12,17 @@ pub type AudioOutputPortKey = OutputPortKey<AudioDescriptor>;
 pub type AudioInputPort = InputPort<AudioDescriptor>;
 pub type AudioOutputPort = OutputPort<AudioDescriptor>;
 
+pub type AudioInputSource = InputSource<AudioDescriptor>;
+pub type AudioOutputSource = OutputSource<AudioDescriptor>;
+
 pub type EventsInputPortKey = InputPortKey<EventsDescriptor>;
 pub type EventsOutputPortKey = OutputPortKey<EventsDescriptor>;
 
 pub type EventsInputPort = InputPort<EventsDescriptor>;
 pub type EventsOutputPort = OutputPort<EventsDescriptor>;
+
+pub type EventsInputSource = InputSource<EventsDescriptor>;
+pub type EventsOutputSource = OutputSource<EventsDescriptor>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct InputPort<D> {
@@ -33,7 +39,7 @@ where
   }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InputSource<D> {
   ModuleBinding(ModuleIn<D>),
   ModuleConnection(ModuleOut<D>),
@@ -55,7 +61,7 @@ where
   }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum OutputSource<D> {
   ModuleBinding(ModuleOut<D>),
   NodeBinding(NodeOut<D>),
@@ -179,7 +185,7 @@ pub trait PortDescriptor: HasId + Clone {
   fn port_type() -> PortType;
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AudioDescriptor {
   id: String,
   channels: usize,
@@ -215,7 +221,7 @@ impl HasId for AudioDescriptor {
   }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EventsDescriptor {
   id: String,
 }

@@ -28,3 +28,9 @@ pub enum AudioError {
 pub trait AudioHandler: Send {
   fn process(&mut self, data: &mut [f32], channels: usize);
 }
+
+pub struct AudioOutputConfig {
+  pub name: String,
+  pub channels: usize,
+  pub buffer_size: usize,
+}

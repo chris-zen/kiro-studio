@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 use std::ops::Deref;
 
-use crate::audio::buffer::AudioBuffer;
-use crate::controller::owned_data::Ref;
 use crate::processor::ports::{Input, Output};
+use crate::rendering::buffers::audio::AudioBuffer;
+use crate::rendering::owned_data::Ref;
 
 pub struct AudioRenderBuffer<IO> {
   num_samples: usize,

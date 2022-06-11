@@ -1,9 +1,9 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::audio::buffer::AudioBuffer;
-use crate::controller::owned_data::Ref;
 use crate::key_gen::Key;
+use crate::rendering::buffers::audio::AudioBuffer;
+use crate::rendering::owned_data::Ref;
 use crate::ParamValue;
 
 #[derive(Debug, Clone)]

@@ -1,11 +1,13 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{BufferSize, Device, OutputCallbackInfo, SampleRate, Stream, StreamConfig};
+use cpal::{
+  BufferSize, Device, OutputCallbackInfo, SampleRate, Stream, StreamConfig, SupportedStreamConfig,
+};
 
-use crate::{AudioConfig, AudioError, AudioHandler, Result};
+use crate::{AudioConfig, AudioError, AudioHandler, AudioOutputConfig, Result};
 
 pub struct AudioDriver {
   _device: Device,
-  _config: StreamConfig,
+  output_config: StreamConfig,
   output_stream: Stream,
 }
 
@@ -43,12 +45,44 @@ impl AudioDriver {
 
     Ok(AudioDriver {
       _device: device,
-      _config: output_config,
+      output_config,
       output_stream,
     })
   }
 
+  pub fn output_config(config: &AudioConfig) -> Result<AudioOutputConfig> {
+    let device = Self::device_from_config(config)?;
+
+    let output_config: SupportedStreamConfig = device
+      .default_output_config()
+      .map_err(AudioError::NoDefaultStreamConfig)?;
+
+    Ok(AudioOutputConfig {
+      name: device.name().unwrap_or("Default output".to_string()),
+      channels: output_config.channels() as usize,
+      buffer_size: config.buffer_size,
+    })
+  }
+
+  pub fn sample_rate(&self) -> u32 {
+    self.output_config.sample_rate.0
+  }
+
+  pub fn num_input_channels(&self) -> usize {
+    0
+  }
+
+  pub fn num_output_channels(&self) -> usize {
+    self.output_config.channels as usize
+  }
+
   pub fn start(&self) -> Result<()> {
     self.output_stream.play().map_err(AudioError::PlayStream)
+  }
+
+  fn device_from_config(_config: &AudioConfig) -> Result<Device> {
+    cpal::default_host()
+      .default_output_device()
+      .ok_or(AudioError::NoDefaultOutputDevice)
   }
 }

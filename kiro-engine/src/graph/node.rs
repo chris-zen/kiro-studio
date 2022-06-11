@@ -72,7 +72,7 @@ impl NodeDescriptor {
     }
   }
 
-  pub fn parameters(mut self, params: Vec<ParamDescriptor>) -> Self {
+  pub fn with_parameters(mut self, params: Vec<ParamDescriptor>) -> Self {
     self.parameters = params;
     self
   }

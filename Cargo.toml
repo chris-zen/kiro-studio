@@ -5,14 +5,12 @@ members = [
     "kiro-time",
     "kiro-engine",
     "kiro-studio",
-#    "kiro-synth",
-#    "kiro-synth-dsp",
+    "kiro-dsp",
+    "kiro-synth",
 ]
 
 exclude = [
     "incubator",
-    "kiro-synth",
-#    "kiro-synth-dsp"
 ]
 
 [profile.dev]

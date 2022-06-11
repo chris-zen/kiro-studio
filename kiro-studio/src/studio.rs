@@ -1,8 +1,7 @@
 use ringbuf::Consumer;
 
 use kiro_audio as audio;
-use kiro_engine::events::{Event, EventData};
-use kiro_engine::{Controller, Engine, EngineConfig, Renderer};
+use kiro_engine::{Engine, EngineConfig, Event, EventData, Renderer};
 use kiro_midi::{self as midi, Driver, DriverSpec};
 
 use crate::config::Config;
@@ -32,7 +31,7 @@ impl Studio {
     let mut engine_config = EngineConfig::default();
     engine_config.audio_buffer_size = audio_config.buffer_size;
 
-    let mut engine = Engine::with_config(engine_config);
+    let mut engine = Engine::new(engine_config);
     // the renderer will always be available just after creating the engine so it is safe to unwrap
     let renderer = engine.take_renderer().unwrap();
 

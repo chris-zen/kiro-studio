@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 
-use crate::controller::owned_data::Ref;
-use crate::events::buffer::{EventsBuffer, Iter};
 use crate::processor::ports::Output;
+use crate::rendering::buffers::events::{EventsBuffer, Iter};
+use crate::rendering::owned_data::Ref;
 
 #[derive(Debug)]
 pub struct EventsPort<IO> {

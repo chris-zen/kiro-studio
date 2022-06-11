@@ -1,12 +1,9 @@
-use std::collections::HashSet;
-
-use crate::graph::error::{Error, Result};
 use crate::graph::node::NodeKey;
 use crate::graph::port::{
-  AudioDescriptor, AudioOutputPort, AudioOutputPortKey, DescriptorPorts, EventsDescriptor,
-  GenericDescriptorPorts, NodeLike, Ports,
+  AudioDescriptor, DescriptorPorts, EventsDescriptor, GenericDescriptorPorts, NodeLike, Ports,
 };
 use crate::key_gen::Key;
+use std::collections::HashSet;
 
 pub type ModuleKey = Key<Module>;
 

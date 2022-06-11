@@ -38,6 +38,10 @@ impl<T> KeyStore<T> {
     self.data.keys()
   }
 
+  pub fn values(&self) -> impl Iterator<Item = &T> {
+    self.data.values()
+  }
+
   pub fn contains_key(&self, key: Key<T>) -> bool {
     self.data.contains_key(&key)
   }
@@ -110,6 +114,11 @@ impl<T: HasId> KeyStoreWithId<T> {
   #[inline]
   pub fn keys(&self) -> impl Iterator<Item = &Key<T>> {
     self.key_store.keys()
+  }
+
+  #[inline]
+  pub fn values(&self) -> impl Iterator<Item = &T> {
+    self.key_store.values()
   }
 
   #[inline]
